@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+
+# Virtual environments
+backend/venv/
+backend/.venv/
+.venv/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+backend/.env
+.env
+
+# Node / Next.js
+frontend/frontend/node_modules/
+frontend/frontend/.next/
+frontend/frontend/.turbo/
+
+# OS
+.DS_Store
+Thumbs.db
