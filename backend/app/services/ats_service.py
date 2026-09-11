@@ -164,28 +164,27 @@ def _heuristic_fallback_analysis(resume_text: str, extracted_skills: List[str]) 
         },
         "resume_builder_guide": {
             "top_actionable_recommendations": [
-                "Apply the Google XYZ Formula: 'Accomplished [X] as measured by [Y], by doing [Z]' to every work bullet.",
-                "Front-load bullet points with impactful action verbs (e.g. Architected, Engineered, Optimized) instead of passive duties.",
-                "Quantify every major achievement with numbers, percentage improvements, latency drops, or user counts.",
-                "Tailor technical keywords directly to your target role to maximize ATS keyword parse index.",
-                "Keep formatting simple: single-column layout, standard headings, no graphical skill bars or multi-column tables."
+                "Quantify impact in every bullet – add measurable numbers, percentages, or scale wherever possible.",
+                "Replace weak passive verbs – swap phrases like 'responsible for' or 'worked on' with strong action verbs such as Built, Optimized, or Led.",
+                f"Boost ATS keyword density – surface more of your detected skills ({', '.join(extracted_skills[:4]) if extracted_skills else 'domain tools'}) directly in experience bullets.",
+                "Tighten each bullet to one strong achievement – remove filler words and focus on outcome over activity.",
+                "Add a Professional Summary – a 2–3 line headline that front-loads your strongest skills and career goal."
             ],
             "bullet_point_improvements": [
                 {
-                    "original": "Worked on backend development and fixed database bugs.",
-                    "improved": "Engineered 12+ REST APIs and optimized PostgreSQL queries, reducing endpoint latency by 34%.",
-                    "explanation": "Replaced weak passive verb ('worked on') with quantifiable scale and concrete performance metrics.",
-                    "formula_applied": "Google XYZ Formula (Accomplished X, measured by Y, by doing Z)"
-                },
-                {
-                    "original": "Responsible for managing team project and coordinating tasks.",
-                    "improved": "Spearheaded agile sprint delivery across 5 engineers, accelerating feature release cycle by 25%.",
-                    "explanation": "Clarifies leadership scope, team size, and measurable delivery velocity.",
-                    "formula_applied": "Action Verb + Scope + Quantifiable Business Impact"
+                    "original": weak_hits[0].capitalize() + " on a key deliverable." if weak_hits else "Worked on development tasks.",
+                    "improved": f"Built and delivered end-to-end solutions, reducing manual effort by ~30% through process automation." if not metric_matches else f"Developed feature reducing processing time by {metric_matches[0]}.",
+                    "explanation": "Leads with a strong action verb and ties the work to a concrete measurable outcome.",
+                    "formula_applied": ""
                 }
             ],
-            "missing_critical_keywords": ["CI/CD Pipelines", "System Architecture", "Performance Optimization", "Automated Testing"],
-            "recommended_sections_to_add": ["Professional Summary (3-line elevator pitch)", "Key Projects with Live/GitHub Links"],
+            "missing_critical_keywords": [s for s in ["Docker", "CI/CD", "REST API", "Agile", "SQL", "Cloud", "Testing"] if s.lower() not in lower and s not in extracted_skills][:5],
+            "recommended_sections_to_add": (
+                (["Professional Summary"] if "summary" not in lower and "objective" not in lower else []) +
+                (["Projects with GitHub / Demo Links"] if "github" not in lower and "project" not in lower else []) +
+                (["Certifications & Courses"] if "certif" not in lower and "course" not in lower else []) +
+                (["Technical Skills (grouped by category)"] if len(extracted_skills) < 4 else [])
+            ) or ["Quantified Achievements section"],
             "formatting_checklist": [
                 {"item": "Single-Column Clean Layout", "passed": True, "tip": "Multi-column layouts often scramble ATS parsers."},
                 {"item": "Standard Section Headings", "passed": True, "tip": "Use standard titles: Experience, Education, Skills, Projects."},
@@ -217,7 +216,10 @@ def analyze_resume_ats(resume_text: str, extracted_skills: Optional[List[str]] =
         "1. AI vs Human Detection (AI probability score 0-100%, synthetic style flags, authentic markers). "
         "2. ATS Compatibility Score (0-100 overall, breakdown across formatting, impact verbs, metrics, completeness, readability, keywords). "
         "3. Diagnostics (strengths, critical red flags, strong vs weak action verbs, metric counts). "
-        "4. Highly personalized 'How to Build a Good Resume/CV' guide with specific Before/After bullet point rewrites based on their ACTUAL resume text using Google's XYZ formula. "
+        "4. A HIGHLY PERSONALIZED resume improvement guide based SOLELY on the actual content of this specific resume — "
+        "   all recommendations, bullet rewrites, missing keywords, and sections must be specific to what IS and IS NOT in this resume. "
+        "   Never use placeholder or generic advice. Bullet rewrites must use actual lines from the resume. "
+        "   formula_applied must always be an empty string. "
         "Respond ONLY with valid, strict JSON matching the exact schema requested."
     )
 
@@ -268,28 +270,28 @@ Return a valid JSON object matching this exact schema:
   }},
   "resume_builder_guide": {{
     "top_actionable_recommendations": [
-      "<concrete tip 1>",
-      "<concrete tip 2>",
-      "<concrete tip 3>",
-      "<concrete tip 4>",
-      "<concrete tip 5>"
+      "<specific recommendation 1 based on THIS resume's actual weaknesses — not generic advice>",
+      "<specific recommendation 2>",
+      "<specific recommendation 3>",
+      "<specific recommendation 4>",
+      "<specific recommendation 5>"
     ],
     "bullet_point_improvements": [
       {{
         "original": "<an actual weak or generic bullet found in the resume>",
-        "improved": "<re-written high-impact version using Google XYZ formula with realistic metrics>",
+        "improved": "<re-written high-impact version with strong action verbs and concrete metrics>",
         "explanation": "<why this rewrite is far more compelling for ATS and hiring managers>",
-        "formula_applied": "Google XYZ Formula (Accomplished [X], measured by [Y], by doing [Z])"
+        "formula_applied": ""
       }},
       {{
         "original": "<second weak bullet from resume>",
         "improved": "<improved high-impact rewrite>",
         "explanation": "<explanation>",
-        "formula_applied": "Action Verb + Scope + Quantifiable Business Impact"
+        "formula_applied": ""
       }}
     ],
-    "missing_critical_keywords": ["<keyword 1>", "<keyword 2>", "<keyword 3>", "<keyword 4>"],
-    "recommended_sections_to_add": ["<section 1>", "<section 2>"],
+    "missing_critical_keywords": ["<keyword missing from resume but important for their apparent target role>", "<keyword 2>", "<keyword 3>"],
+    "recommended_sections_to_add": ["<specific section missing from THIS resume — e.g. Professional Summary, GitHub Projects, Certifications>", "<section 2>"],
     "formatting_checklist": [
       {{"item": "Single-Column Clean Layout", "passed": true, "tip": "Multi-column tables can confuse ATS parsers."}},
       {{"item": "Standard Section Headings", "passed": true, "tip": "Use standard titles: Experience, Education, Skills, Projects."}},

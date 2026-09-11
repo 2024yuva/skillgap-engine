@@ -374,33 +374,29 @@ export default function AtsResultsPanel({ data }: { data: AtsAnalysisResult }) {
           {resume_builder_guide.top_actionable_recommendations.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-slate-700 mb-2">Top Recommendations</p>
-              <ol className="space-y-2">
-                {resume_builder_guide.top_actionable_recommendations.map((r, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
-                    <span className="mt-0.5 w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 font-bold text-[10px] flex items-center justify-center shrink-0">
-                      {i + 1}
-                    </span>
-                    {r}
-                  </li>
-                ))}
+              <ol className="space-y-2.5">
+                {resume_builder_guide.top_actionable_recommendations.map((r, i) => {
+                  const parts = r.split(" – ");
+                  const title = parts.length > 1 ? parts[0] : (r.split(" - ").length > 1 ? r.split(" - ")[0] : null);
+                  const desc = parts.length > 1 ? parts.slice(1).join(" – ") : (r.split(" - ").length > 1 ? r.split(" - ").slice(1).join(" - ") : r);
+                  return (
+                    <li key={i} className="flex items-start gap-2.5 text-xs text-slate-600 leading-relaxed">
+                      <span className="mt-0.5 w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 font-bold text-[10px] flex items-center justify-center shrink-0">
+                        {i + 1}
+                      </span>
+                      <div>
+                        {title ? (
+                          <>
+                            <strong className="font-semibold text-slate-800">{title}</strong> – {desc}
+                          </>
+                        ) : (
+                          r
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ol>
-            </div>
-          )}
-
-          {/* Missing keywords */}
-          {resume_builder_guide.missing_critical_keywords.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-red-600 mb-1.5">Missing Critical Keywords</p>
-              <div className="flex flex-wrap gap-1.5">
-                {resume_builder_guide.missing_critical_keywords.map((k, i) => (
-                  <span
-                    key={i}
-                    className="text-[11px] font-medium px-2 py-0.5 bg-red-50 border border-red-200 text-red-600 rounded-full"
-                  >
-                    {k}
-                  </span>
-                ))}
-              </div>
             </div>
           )}
 
@@ -412,7 +408,7 @@ export default function AtsResultsPanel({ data }: { data: AtsAnalysisResult }) {
                 {resume_builder_guide.recommended_sections_to_add.map((s, i) => (
                   <span
                     key={i}
-                    className="text-[11px] font-medium px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-full"
+                    className="text-[11px] font-medium px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-full"
                   >
                     {s}
                   </span>
@@ -436,13 +432,9 @@ export default function AtsResultsPanel({ data }: { data: AtsAnalysisResult }) {
                         <span className="font-semibold">Before: </span>
                         {b.original}
                       </div>
-                      <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-100 text-emerald-700">
+                      <div className="px-3 py-2 bg-emerald-50 text-emerald-700">
                         <span className="font-semibold">After: </span>
                         {b.improved}
-                      </div>
-                      <div className="px-3 py-2 bg-slate-50 text-slate-500">
-                        <span className="font-semibold text-slate-600">Formula: </span>
-                        {b.formula_applied} — {b.explanation}
                       </div>
                     </div>
                   )
