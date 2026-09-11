@@ -138,6 +138,70 @@ export interface UserCompetency {
   competency: Competency;
 }
 
+export interface AiDetection {
+  ai_probability_score: number;
+  human_score: number;
+  verdict: string;
+  verdict_summary: string;
+  flagged_ai_patterns: string[];
+  human_markers: string[];
+}
+
+export interface AtsScoring {
+  overall_score: number;
+  grade: string;
+  formatting_score: number;
+  impact_score: number;
+  metrics_score: number;
+  completeness_score: number;
+  readability_score: number;
+  keyword_score: number;
+}
+
+export interface SectionHealthItem {
+  section: string;
+  status: "good" | "warning" | "missing";
+  feedback: string;
+}
+
+export interface AtsDiagnostics {
+  key_strengths: string[];
+  critical_issues: string[];
+  quantifiable_metrics_count: number;
+  quantifiable_metrics_examples: string[];
+  action_verbs_strong: string[];
+  action_verbs_weak: string[];
+  section_health: SectionHealthItem[];
+}
+
+export interface BulletPointImprovement {
+  original: string;
+  improved: string;
+  explanation: string;
+  formula_applied: string;
+}
+
+export interface FormattingChecklistItem {
+  item: string;
+  passed: boolean;
+  tip: string;
+}
+
+export interface ResumeBuilderGuide {
+  top_actionable_recommendations: string[];
+  bullet_point_improvements: BulletPointImprovement[];
+  missing_critical_keywords: string[];
+  recommended_sections_to_add: string[];
+  formatting_checklist: FormattingChecklistItem[];
+}
+
+export interface AtsAnalysisResult {
+  ai_detection: AiDetection;
+  ats_scoring: AtsScoring;
+  diagnostics: AtsDiagnostics;
+  resume_builder_guide: ResumeBuilderGuide;
+}
+
 export interface ParsedResumeProfile {
   name: string | null;
   education: string;
@@ -148,7 +212,9 @@ export interface ParsedResumeProfile {
   courses_certifications: string[];
   matched_competency_ids: number[];
   inferred_levels: Record<string, number>;
+  ats_analysis?: AtsAnalysisResult;
 }
+
 
 export interface AssessmentQuestion {
   id: number;

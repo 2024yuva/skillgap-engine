@@ -182,6 +182,7 @@ class ExtractedProfile:
     matched_competency_ids: list[int] = field(default_factory=list)
     # competency_id -> inferred level (1-3, conservative)
     inferred_levels: dict[int, int] = field(default_factory=dict)
+    raw_text: str = ""
 
 
 SOFT_SKILL_WORDS = [
@@ -224,9 +225,6 @@ def parse_resume(filename: str, data: bytes) -> ExtractedProfile:
     matched_ids = _match_competencies_by_keywords(text)
 
     # Infer competency levels conservatively
-    # If mentioned in projects/experience section -> level 3 (intermediate)
-    # If mentioned in skills section -> level 2 (basic)
-    # Otherwise -> level 1 (awareness)
     skills_lower = " ".join(skill_lines).lower()
     proj_exp_lower = " ".join(
         sections.get("projects", []) + sections.get("experience", [])
@@ -234,7 +232,6 @@ def parse_resume(filename: str, data: bytes) -> ExtractedProfile:
 
     inferred: dict[int, int] = {}
     for comp_id in matched_ids:
-        # Find keywords for this competency from the normalization map
         comp_keywords = [kw for kw, cid in SKILL_NORMALIZATION_MAP.items() if cid == comp_id]
         in_skills = any(kw in skills_lower for kw in comp_keywords)
         in_proj = any(kw in proj_exp_lower for kw in comp_keywords)
@@ -255,4 +252,6 @@ def parse_resume(filename: str, data: bytes) -> ExtractedProfile:
         courses_certifications=cert_lines[:10],
         matched_competency_ids=matched_ids,
         inferred_levels=inferred,
+        raw_text=text,
     )
+
