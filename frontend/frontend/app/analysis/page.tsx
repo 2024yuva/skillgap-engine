@@ -22,6 +22,7 @@ import {
   Info,
   Loader2,
   ArrowRight,
+  ExternalLink,
 } from "lucide-react";
 
 // ─── Status config ──────────────────────────────────────────────────────────
@@ -102,6 +103,15 @@ function groupByStatus(gaps: CompetencyGap[]) {
     groups[g.status].push(g);
   }
   return groups;
+}
+
+function evidenceLinks(skillName: string) {
+  const query = encodeURIComponent(`${skillName} course project`);
+  return [
+    { label: "Learn", url: `https://www.youtube.com/results?search_query=${query}` },
+    { label: "NPTEL", url: `https://nptel.ac.in/courses?search=${encodeURIComponent(skillName)}` },
+    { label: "Show project", url: `https://github.com/search?q=${encodeURIComponent(skillName)}&type=repositories` },
+  ];
 }
 
 export default function AnalysisPage() {
@@ -201,11 +211,11 @@ export default function AnalysisPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {(
               [
-                ["strong_match",       strong_match_count],
-                ["related",            related_count],
+                ["strong_match", strong_match_count],
+                ["related", related_count],
                 ["needs_verification", needs_verification_count],
-                ["needs_development",  needs_development_count],
-                ["missing",            missing_count],
+                ["needs_development", needs_development_count],
+                ["missing", missing_count],
               ] as [Status, number][]
             ).map(([s, count]) => {
               const cfg = STATUS_CONFIG[s];
@@ -215,11 +225,10 @@ export default function AnalysisPage() {
                 <button
                   key={s}
                   onClick={() => setActiveSection(isActive ? "all" : s)}
-                  className={`rounded-xl p-3 border text-left transition-all ${
-                    isActive
+                  className={`rounded-xl p-3 border text-left transition-all ${isActive
                       ? `${cfg.bg} ${cfg.ring} border-2`
                       : "bg-white border-slate-200 hover:border-indigo-200"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-1.5 mb-1">
                     <Icon size={13} className={cfg.color} />
@@ -424,6 +433,27 @@ function CompetencyCard({
                 <span className="font-semibold">Related skill detected:</span>{" "}
                 {gap.related_skill_name} — your experience here is transferable.
               </p>
+            </div>
+          )}
+
+          {gap.status === "missing" && (
+            <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-xs font-semibold text-slate-600 mb-1.5">Build evidence for this skill</p>
+              <div className="flex flex-wrap gap-2">
+                {evidenceLinks(gap.competency_name).map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-1 text-[11px] font-semibold text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50"
+                  >
+                    {link.label}
+                    <ExternalLink size={10} />
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 

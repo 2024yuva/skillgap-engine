@@ -45,7 +45,7 @@ export default function ProfilePage() {
         comps.forEach(c => { map[c.id] = c.name; });
         setCompetencyNames(map);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   function onDragOver(e: React.DragEvent) { e.preventDefault(); setDragging(true); }
@@ -69,6 +69,14 @@ export default function ProfilePage() {
       setEditedSoftSkills(result.soft_skills);
 
       let currentSession = session;
+      if (currentSession) {
+        try {
+          await api.users.get(currentSession.id);
+        } catch (e) {
+          if (!(e instanceof Error) || !e.message.includes("404")) throw e;
+          currentSession = null;
+        }
+      }
       if (!currentSession) {
         const newUser = await api.users.create({
           name: result.name || file.name.split(".")[0],
@@ -102,14 +110,15 @@ export default function ProfilePage() {
   }
 
   async function handleApply() {
-    if (!parsed || !session) return;
+    const currentSession = getSession();
+    if (!parsed || !currentSession) return;
     setApplying(true);
     try {
       const levels: Record<number, number> = {};
       for (const [k, v] of Object.entries(parsed.inferred_levels)) {
         levels[Number(k)] = v;
       }
-      await api.resume.apply(session.id, {
+      await api.resume.apply(currentSession.id, {
         inferred_levels: levels,
         name: parsed.name ?? undefined,
         education: parsed.education || undefined,
@@ -147,9 +156,8 @@ export default function ProfilePage() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                tab === t ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${tab === t ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               {t === "upload" ? "Upload Resume" : "Manual Input"}
             </button>
