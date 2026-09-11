@@ -76,7 +76,7 @@ venv\Scripts\activate          # Windows
 
 # Install dependencies
 pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic python-dotenv \
-            sentence-transformers pandas numpy networkx
+            python-multipart PyPDF2 python-docx sentence-transformers pandas numpy networkx
 
 # Configure database URL
 copy .env.example .env         # then edit if needed

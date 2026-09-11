@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import { api, type CourseRecommendation } from "@/lib/api";
+import { api, type CourseRecommendation, type AssessmentResult } from "@/lib/api";
 import { getSession, getSelectedRole } from "@/lib/session";
 import { Map, ArrowRight, Clock, ChevronRight } from "lucide-react";
 
@@ -11,14 +11,21 @@ export default function LearningPathPage() {
   const router = useRouter();
   const [recs, setRecs] = useState<CourseRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dsa, setDsa] = useState<AssessmentResult | null>(null);
 
   useEffect(() => {
     const session = getSession();
     const role = getSelectedRole();
     if (!session) { router.replace("/"); return; }
     if (!role) { router.replace("/role"); return; }
-    api.analysis.recommendations(session.id, role.id, 8)
-      .then(r => setRecs(r.recommendations))
+    Promise.all([
+      api.analysis.recommendations(session.id, role.id, 8),
+      api.assessment.latest(session.id).catch(() => null),
+    ])
+      .then(([r, a]) => {
+        setRecs(r.recommendations);
+        if (a?.completed && a.result) setDsa(a.result);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [router]);
@@ -34,6 +41,32 @@ export default function LearningPathPage() {
             A recommended sequence to achieve your goal{role ? ` of ${role.name}` : ""}.
           </p>
         </div>
+
+        {dsa && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm mb-8">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              From your DSA Skill Assessment
+            </p>
+            <p className="text-sm text-slate-800 mb-3">
+              Overall <strong>{dsa.overall_label}</strong>
+              {dsa.biggest_gaps.length > 0 && (
+                <span className="text-slate-500">
+                  {" "}— focus on {dsa.biggest_gaps.map(g => g.label).join(" and ")}.
+                </span>
+              )}
+            </p>
+            <ol className="space-y-2">
+              {dsa.next_steps.slice(0, 5).map((s, i) => (
+                <li key={s} className="flex gap-3 text-sm text-slate-700">
+                  <span className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold flex items-center justify-center shrink-0">
+                    {i + 1}
+                  </span>
+                  {s}
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center min-h-48">
