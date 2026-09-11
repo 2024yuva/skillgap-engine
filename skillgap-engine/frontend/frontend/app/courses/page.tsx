@@ -8,22 +8,22 @@ import { getSession, getSelectedRole } from "@/lib/session";
 import { BookOpen, ExternalLink, Zap, TrendingUp, ArrowRight } from "lucide-react";
 
 const LEVEL_COLORS: Record<string, string> = {
-  beginner:     "bg-emerald-50 text-emerald-700 border-emerald-200",
+  beginner: "bg-emerald-50 text-emerald-700 border-emerald-200",
   intermediate: "bg-blue-50 text-blue-700 border-blue-200",
-  advanced:     "bg-violet-50 text-violet-700 border-violet-200",
+  advanced: "bg-violet-50 text-violet-700 border-violet-200",
 };
 
 const PROVIDER_COLORS: Record<string, string> = {
-  "NPTEL":    "bg-orange-50 text-orange-700",
+  "NPTEL": "bg-orange-50 text-orange-700",
   "Coursera": "bg-blue-50 text-blue-700",
-  "Kaggle":   "bg-sky-50 text-sky-700",
-  "Udemy":    "bg-red-50 text-red-700",
-  "Swayam":   "bg-teal-50 text-teal-700",
-  "Educative":"bg-emerald-50 text-emerald-700",
-  "GitHub":   "bg-slate-100 text-slate-700",
-  "iGOT":     "bg-indigo-50 text-indigo-700",
-  "MathWorks":"bg-rose-50 text-rose-700",
-  "IASRI":    "bg-amber-50 text-amber-700",
+  "Kaggle": "bg-sky-50 text-sky-700",
+  "Udemy": "bg-red-50 text-red-700",
+  "Swayam": "bg-teal-50 text-teal-700",
+  "Educative": "bg-emerald-50 text-emerald-700",
+  "GitHub": "bg-slate-100 text-slate-700",
+  "iGOT": "bg-indigo-50 text-indigo-700",
+  "MathWorks": "bg-rose-50 text-rose-700",
+  "IASRI": "bg-amber-50 text-amber-700",
 };
 
 export default function CoursesPage() {
@@ -88,9 +88,8 @@ export default function CoursesPage() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  filter === f ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                }`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === f ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
               >
                 {f === "top" ? "Top Picks" : `All (${recs.length})`}
               </button>
@@ -125,7 +124,7 @@ export default function CoursesPage() {
 
         {/* Learning path CTA */}
         {recs.length > 0 && (
-          <div className="mt-8 p-5 bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-200 rounded-2xl flex items-center justify-between gap-4">
+          <div className="mt-8 p-5 bg-linear-to-r from-indigo-50 to-violet-50 border border-indigo-200 rounded-2xl flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-bold text-indigo-900">Build your personalised learning path</p>
               <p className="text-xs text-indigo-600 mt-0.5">
@@ -156,8 +155,8 @@ function CourseRow({ rec, rank }: { rec: CourseRecommendation; rank: number }) {
   const impactColor = impact_score >= 1.0
     ? "bg-violet-100 text-violet-700 border-violet-200"
     : impact_score >= 0.5
-    ? "bg-blue-100 text-blue-700 border-blue-200"
-    : "bg-slate-100 text-slate-600 border-slate-200";
+      ? "bg-blue-100 text-blue-700 border-blue-200"
+      : "bg-slate-100 text-slate-600 border-slate-200";
 
   const gapClosurePct = Math.min(Math.round(impact_score * 50), 99);
   const providerColor = PROVIDER_COLORS[course.provider ?? ""] ?? "bg-slate-100 text-slate-700";
@@ -211,7 +210,7 @@ function CourseRow({ rec, rank }: { rec: CourseRecommendation; rank: number }) {
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all"
+                className="h-full bg-linear-to-r from-indigo-500 to-violet-500 rounded-full transition-all"
                 style={{ width: `${gapClosurePct}%` }}
               />
             </div>
