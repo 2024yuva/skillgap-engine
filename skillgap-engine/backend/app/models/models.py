@@ -13,6 +13,7 @@ from sqlalchemy import (
     UniqueConstraint,
     CheckConstraint,
 )
+from datetime import datetime
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
@@ -92,7 +93,7 @@ class User(Base):
 
 
 class UserCompetency(Base):
-    """Records a user's current competency level with evidence."""
+    """Records a user's current competency level with evidence and verification."""
     __tablename__ = "user_competencies"
     __table_args__ = (
         UniqueConstraint("user_id", "competency_id", name="uq_user_competency"),
@@ -101,9 +102,31 @@ class UserCompetency(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     competency_id = Column(Integer, ForeignKey("competencies.id"), nullable=False)
+
+    # Estimated level from resume/profile analysis
     current_level = Column(Integer, nullable=False, default=0)  # 0-5
-    evidence_source = Column(String(300), nullable=True)        # e.g. "NPTEL certificate"
+
+    # Verified level after assessment (if user takes assessment)
+    verified_level = Column(Integer, nullable=True)  # 0-5, null if not verified
+
+    # Evidence and confidence
+    evidence = Column(Text, nullable=True)                     # e.g. "Implemented ML project using Python, Pandas, NumPy"
+    evidence_source = Column(String(300), nullable=True)       # e.g. "resume_analysis", "assessment", "user_input"
+    confidence = Column(Float, nullable=True, default=0.5)     # 0.0-1.0, how confident is the system
+
+    # Verification tracking
+    verification_status = Column(
+        String(50),
+        nullable=False,
+        default="unverified"
+    )  # unverified, needs_assessment, verified
+
     last_demonstrated = Column(Date, nullable=True)
+    last_verified = Column(Date, nullable=True)
+
+    # Assessment tracking
+    assessment_score = Column(Float, nullable=True)  # 0-100
+    assessment_date = Column(Date, nullable=True)
 
     user = relationship("User", back_populates="user_competencies")
     competency = relationship("Competency", back_populates="user_competencies")

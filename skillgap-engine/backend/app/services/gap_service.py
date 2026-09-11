@@ -5,6 +5,7 @@ Responsibilities:
 - Load role requirements and user competency levels from the DB.
 - Convert ORM rows to engine dataclasses.
 - Call engine functions.
+- Classify competencies using user-friendly categories.
 - Convert engine output back to Pydantic response schemas.
 """
 
@@ -20,6 +21,7 @@ from app.engine.gap_engine import (
     CompetencyNode, RoleRequirement, UserLevel, CourseNode,
     analyse_gaps, compute_readiness_score, rank_courses,
 )
+from app.services.classification import classify_competency
 from app.schemas.schemas import (
     GapAnalysisResult, CompetencyGap,
     CourseRecommendationResult, CourseRecommendation, CourseRead,
@@ -67,6 +69,26 @@ def _load_user_levels(user_id: int, db: Session) -> list[UserLevel]:
     ]
 
 
+def _load_user_competency_details(user_id: int, db: Session) -> dict:
+    """Load full UserCompetency details including evidence, confidence, verification."""
+    rows = (
+        db.query(UserCompetency)
+        .filter(UserCompetency.user_id == user_id)
+        .all()
+    )
+    return {
+        uc.competency_id: {
+            "evidence": uc.evidence,
+            "evidence_source": uc.evidence_source,
+            "confidence": uc.confidence or 0.5,
+            "verification_status": uc.verification_status or "unverified",
+            "verified_level": uc.verified_level,
+            "assessment_score": uc.assessment_score,
+        }
+        for uc in rows
+    }
+
+
 def _load_courses(db: Session) -> list[CourseNode]:
     courses = (
         db.query(Course)
@@ -107,6 +129,7 @@ def get_gap_analysis(user_id: int, role_id: int, db: Session) -> GapAnalysisResu
     comp_map = _load_competency_map(db)
     requirements = _load_role_requirements(role_id, db)
     user_levels = _load_user_levels(user_id, db)
+    user_details = _load_user_competency_details(user_id, db)
 
     gap_rows = analyse_gaps(requirements, user_levels, comp_map)
     readiness = compute_readiness_score(gap_rows)
@@ -121,7 +144,46 @@ def get_gap_analysis(user_id: int, role_id: int, db: Session) -> GapAnalysisResu
             gap=g.gap,
             importance=g.importance,
             priority_score=round(g.priority_score, 4),
+            evidence=user_details.get(g.competency_id, {}).get("evidence"),
             evidence_source=g.evidence_source,
+            confidence=user_details.get(g.competency_id, {}).get("confidence", 0.5),
+            classification=(
+                classify_competency(
+                    competency_id=g.competency_id,
+                    competency_name=g.competency_name,
+                    category=g.category,
+                    current_level=g.current_level,
+                    required_level=g.required_level,
+                    gap=g.gap,
+                    importance=g.importance,
+                    priority_score=g.priority_score,
+                    evidence=user_details.get(g.competency_id, {}).get("evidence"),
+                    evidence_source=g.evidence_source,
+                    confidence=user_details.get(g.competency_id, {}).get("confidence", 0.5),
+                    verification_status=user_details.get(g.competency_id, {}).get("verification_status", "unverified"),
+                    verified_level=user_details.get(g.competency_id, {}).get("verified_level"),
+                    assessment_score=user_details.get(g.competency_id, {}).get("assessment_score"),
+                ).classification.value
+            ),
+            explanation=(
+                classify_competency(
+                    competency_id=g.competency_id,
+                    competency_name=g.competency_name,
+                    category=g.category,
+                    current_level=g.current_level,
+                    required_level=g.required_level,
+                    gap=g.gap,
+                    importance=g.importance,
+                    priority_score=g.priority_score,
+                    evidence=user_details.get(g.competency_id, {}).get("evidence"),
+                    evidence_source=g.evidence_source,
+                    confidence=user_details.get(g.competency_id, {}).get("confidence", 0.5),
+                    verification_status=user_details.get(g.competency_id, {}).get("verification_status", "unverified"),
+                    verified_level=user_details.get(g.competency_id, {}).get("verified_level"),
+                    assessment_score=user_details.get(g.competency_id, {}).get("assessment_score"),
+                ).explanation
+            ),
+            verification_status=user_details.get(g.competency_id, {}).get("verification_status", "unverified"),
         )
         for g in gap_rows
     ]

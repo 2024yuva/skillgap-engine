@@ -96,7 +96,7 @@ class CourseRead(CourseBase):
 # ---------------------------------------------------------------------------
 
 class CompetencyGap(BaseModel):
-    """A single competency's gap breakdown."""
+    """A single competency's gap breakdown with user-friendly classification."""
     competency_id: int
     competency_name: str
     category: str
@@ -104,8 +104,17 @@ class CompetencyGap(BaseModel):
     required_level: int
     gap: int                      # max(required - current, 0)
     importance: float
-    priority_score: float         # normalized_gap * importance
-    evidence_source: Optional[str] = None
+    priority_score: float         # normalized_gap * importance (internal use)
+
+    # Evidence and confidence
+    evidence: Optional[str] = None                 # e.g. "Implemented ML project using Python, Pandas, NumPy"
+    evidence_source: Optional[str] = None          # e.g. "resume_analysis"
+    confidence: float = 0.5                        # 0.0-1.0: system confidence in the assessment
+
+    # User-facing classification
+    classification: str                            # strong_match, related, needs_verification, needs_development, missing_evidence
+    explanation: str                               # Human-readable reason for classification
+    verification_status: str                       # unverified, needs_assessment, verified
 
 
 class GapAnalysisResult(BaseModel):

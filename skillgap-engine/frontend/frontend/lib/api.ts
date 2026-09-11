@@ -78,7 +78,12 @@ export interface CompetencyGap {
   gap: number;
   importance: number;
   priority_score: number;
+  evidence: string | null;
   evidence_source: string | null;
+  confidence: number;
+  classification: string;  // strong_match, related, needs_verification, needs_development, missing_evidence
+  explanation: string;
+  verification_status: string;  // unverified, needs_assessment, verified
 }
 
 export interface GapAnalysisResult {

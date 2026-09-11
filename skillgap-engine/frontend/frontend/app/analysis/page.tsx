@@ -5,18 +5,18 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { api, type GapAnalysisResult, type CompetencyGap } from "@/lib/api";
 import { getSession, getSelectedRole } from "@/lib/session";
-import { AlertTriangle, TrendingDown, CheckCircle2, Info } from "lucide-react";
+import { CheckCircle2, AlertTriangle, HelpCircle, BookOpen, Zap, Info } from "lucide-react";
 
 const LEVEL_LABELS = ["No Evidence", "Awareness", "Basic", "Intermediate", "Advanced", "Expert"];
-const MAX_LEVEL = 5;
+
+type ClassificationGroup = "strong_match" | "related" | "needs_verification" | "needs_development" | "missing_evidence";
 
 export default function AnalysisPage() {
   const router = useRouter();
   const [result, setResult] = useState<GapAnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [showAll, setShowAll] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   useEffect(() => {
     const session = getSession();
@@ -30,29 +30,37 @@ export default function AnalysisPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  const categories = useMemo(() => {
-    if (!result) return [];
-    const cats = Array.from(new Set(result.gaps.map(g => g.category)));
-    return ["All", ...cats.sort()];
+  // Group competencies by classification
+  const groupedByClassification = useMemo(() => {
+    if (!result) return {
+      strong_match: [],
+      related: [],
+      needs_verification: [],
+      needs_development: [],
+      missing_evidence: [],
+    };
+    const groups: Record<ClassificationGroup, CompetencyGap[]> = {
+      strong_match: [],
+      related: [],
+      needs_verification: [],
+      needs_development: [],
+      missing_evidence: [],
+    };
+    result.gaps.forEach(gap => {
+      const classification = gap.classification as ClassificationGroup;
+      if (groups[classification]) {
+        groups[classification].push(gap);
+      }
+    });
+    return groups;
   }, [result]);
-
-  const filtered = useMemo(() => {
-    if (!result) return [];
-    const f = categoryFilter === "All" ? result.gaps : result.gaps.filter(g => g.category === categoryFilter);
-    return showAll ? f : f.slice(0, 8);
-  }, [result, categoryFilter, showAll]);
-
-  const totalFiltered = useMemo(() => {
-    if (!result) return 0;
-    return categoryFilter === "All" ? result.gaps.length : result.gaps.filter(g => g.category === categoryFilter).length;
-  }, [result, categoryFilter]);
 
   if (loading) return (
     <AppShell>
       <div className="flex items-center justify-center h-full min-h-96">
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-slate-500">Running competency gap analysis...</p>
+          <p className="text-sm text-slate-500">Analyzing your competencies...</p>
         </div>
       </div>
     </AppShell>
@@ -72,155 +80,93 @@ export default function AnalysisPage() {
 
   if (!result) return null;
 
-  const highPriority = result.gaps.filter(g => g.priority_score >= 0.3 && g.gap > 0);
-
   return (
     <AppShell>
       <div className="max-w-5xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Your Competency Profile</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {result.user_name} &nbsp;&#8594;&nbsp; <span className="font-semibold text-indigo-600">{result.role_name}</span>
-            </p>
-          </div>
-
-          {/* Summary stats */}
-          <div className="flex gap-3 flex-wrap">
-            <StatCard icon={<TrendingDown size={14} />} label="Gaps" value={result.gap_count} color="red" />
-            <StatCard icon={<CheckCircle2 size={14} />} label="Met" value={result.covered_count} color="emerald" />
-            <StatCard icon={<AlertTriangle size={14} />} label="High Priority" value={highPriority.length} color="orange" />
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900 mb-1">
+            Your Path to {result.role_name}
+          </h1>
+          <p className="text-slate-600">
+            Based on your profile, here's what you already have and what you need to develop.
+          </p>
         </div>
 
-        {/* Two column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: summary + readiness */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Readiness score */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                Readiness Score <span className="text-slate-300 normal-case font-normal">(secondary)</span>
-              </p>
-              <ReadinessRing score={result.readiness_score} />
-            </div>
+        {/* SECTION 1: YOU ALREADY HAVE */}
+        {groupedByClassification.strong_match.length > 0 && (
+          <Section
+            title="You Already Have"
+            subtitle={`${groupedByClassification.strong_match.length} competency match`}
+            icon={<CheckCircle2 size={20} className="text-emerald-600" />}
+            items={groupedByClassification.strong_match}
+            expandedId={expandedId}
+            setExpandedId={setExpandedId}
+          />
+        )}
 
-            {/* Priority Legend */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Priority Guide</p>
-              <div className="space-y-2 text-xs">
-                {[
-                  { color: "bg-red-500", label: "Critical gap", range: "Priority >= 0.5" },
-                  { color: "bg-orange-400", label: "High gap", range: "Priority 0.3-0.5" },
-                  { color: "bg-yellow-400", label: "Medium gap", range: "Priority 0.1-0.3" },
-                  { color: "bg-emerald-400", label: "Met or minor", range: "Priority < 0.1" },
-                ].map(({ color, label, range }) => (
-                  <div key={label} className="flex items-center gap-2.5">
-                    <div className={`w-2.5 h-2.5 rounded-sm shrink-0 ${color}`} />
-                    <div>
-                      <p className="text-slate-700 font-medium">{label}</p>
-                      <p className="text-slate-400">{range}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 pt-3 border-t border-slate-100">
-                <p className="text-xs text-slate-400">
-                  Priority = (gap / 5) &times; importance
-                </p>
-              </div>
-            </div>
+        {/* SECTION 2: RELATED EXPERIENCE */}
+        {groupedByClassification.related.length > 0 && (
+          <Section
+            title="Related Experience"
+            subtitle={`${groupedByClassification.related.length} transferable competency`}
+            icon={<Zap size={20} className="text-amber-600" />}
+            items={groupedByClassification.related}
+            expandedId={expandedId}
+            setExpandedId={setExpandedId}
+          />
+        )}
 
-            {/* High priority callout */}
-            {highPriority.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-red-700 font-medium">
-                    You have <strong>{highPriority.length} high-priority skill gap{highPriority.length > 1 ? "s" : ""}</strong> to reach your target role.
-                  </p>
-                </div>
-                <div className="mt-2 space-y-1">
-                  {highPriority.slice(0, 3).map(g => (
-                    <p key={g.competency_id} className="text-xs text-red-600 pl-4">
-                      {g.competency_name}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
+        {/* SECTION 3: NEEDS VERIFICATION */}
+        {groupedByClassification.needs_verification.length > 0 && (
+          <Section
+            title="Needs Verification"
+            subtitle={`${groupedByClassification.needs_verification.length} competency needs assessment`}
+            icon={<HelpCircle size={20} className="text-blue-600" />}
+            items={groupedByClassification.needs_verification}
+            expandedId={expandedId}
+            setExpandedId={setExpandedId}
+          />
+        )}
+
+        {/* SECTION 4: NEEDS DEVELOPMENT */}
+        {groupedByClassification.needs_development.length > 0 && (
+          <Section
+            title="Needs Development"
+            subtitle={`${groupedByClassification.needs_development.length} competency below requirement`}
+            icon={<AlertTriangle size={20} className="text-orange-600" />}
+            items={groupedByClassification.needs_development}
+            expandedId={expandedId}
+            setExpandedId={setExpandedId}
+          />
+        )}
+
+        {/* SECTION 5: MISSING EVIDENCE */}
+        {groupedByClassification.missing_evidence.length > 0 && (
+          <Section
+            title="Missing Evidence"
+            subtitle={`${groupedByClassification.missing_evidence.length} competency not found`}
+            icon={<BookOpen size={20} className="text-slate-600" />}
+            items={groupedByClassification.missing_evidence}
+            expandedId={expandedId}
+            setExpandedId={setExpandedId}
+          />
+        )}
+
+        {/* CTA to courses */}
+        <div className="mt-8 p-6 bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl flex items-center justify-between gap-4">
+          <div>
+            <p className="text-lg font-semibold text-indigo-900">Next: Find Learning Resources</p>
+            <p className="text-sm text-indigo-700 mt-1">
+              Get personalized course recommendations ranked by impact on your gaps.
+            </p>
           </div>
-
-          {/* Right: competency bars */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Category filter */}
-            <div className="flex flex-wrap gap-2">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => { setCategoryFilter(cat); setShowAll(false); }}
-                  className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${
-                    categoryFilter === cat
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {/* Legend */}
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-indigo-500" />
-                Your Level
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-red-200" />
-                Gap
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-0.5 h-3 bg-slate-700" />
-                Required Level
-              </div>
-            </div>
-
-            {/* Bars */}
-            <div className="space-y-3">
-              {filtered.map(g => <CompetencyRow key={g.competency_id} gap={g} />)}
-            </div>
-
-            {totalFiltered > filtered.length && (
-              <button
-                onClick={() => setShowAll(true)}
-                className="text-sm text-indigo-600 hover:underline font-medium"
-              >
-                Show all {totalFiltered} competencies
-              </button>
-            )}
-
-            {filtered.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-8">No competencies in this category.</p>
-            )}
-
-            {/* Go to courses CTA */}
-            <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-indigo-900">Ready for course recommendations?</p>
-                <p className="text-xs text-indigo-600 mt-0.5">
-                  Courses ranked by how much of your remaining gap they close.
-                </p>
-              </div>
-              <button
-                onClick={() => router.push("/courses")}
-                className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all"
-              >
-                View Courses
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={() => router.push("/courses")}
+            className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl transition-all"
+          >
+            View Courses
+          </button>
         </div>
       </div>
     </AppShell>
@@ -228,127 +174,132 @@ export default function AnalysisPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Competency row component
+// Section component
 // ---------------------------------------------------------------------------
-function CompetencyRow({ gap }: { gap: CompetencyGap }) {
-  const currentPct = (gap.current_level / MAX_LEVEL) * 100;
-  const requiredPct = (gap.required_level / MAX_LEVEL) * 100;
-  const gapPct = Math.max(requiredPct - currentPct, 0);
-
-  const priorityColor =
-    gap.priority_score >= 0.5 ? "border-l-red-500" :
-    gap.priority_score >= 0.3 ? "border-l-orange-400" :
-    gap.priority_score >= 0.1 ? "border-l-yellow-400" :
-    "border-l-emerald-400";
-
-  const gapTextColor =
-    gap.gap === 0 ? "text-emerald-600" :
-    gap.gap <= 1 ? "text-yellow-600" :
-    gap.gap <= 2 ? "text-orange-600" : "text-red-600";
-
-  return (
-    <div className={`bg-white rounded-xl border border-slate-200 border-l-4 ${priorityColor} p-4 shadow-sm`}>
-      <div className="flex items-start justify-between gap-3 mb-2.5">
-        <div>
-          <p className="text-sm font-semibold text-slate-800">{gap.competency_name}</p>
-          <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-medium">
-            {gap.category}
-          </span>
-        </div>
-        <div className="text-right shrink-0">
-          <span className={`text-sm font-bold ${gapTextColor}`}>
-            {gap.gap === 0 ? "Met" : `Gap: ${gap.gap}`}
-          </span>
-          <p className="text-[10px] text-slate-400 mt-0.5">priority {gap.priority_score.toFixed(3)}</p>
-        </div>
-      </div>
-
-      {/* Stacked progress bar */}
-      <div className="relative h-3.5 rounded-full bg-slate-100 overflow-hidden">
-        <div
-          className="absolute inset-y-0 left-0 rounded-l-full bg-indigo-500"
-          style={{ width: `${currentPct}%` }}
-        />
-        {gapPct > 0 && (
-          <div
-            className="absolute inset-y-0 bg-red-200"
-            style={{ left: `${currentPct}%`, width: `${gapPct}%` }}
-          />
-        )}
-        {/* Required marker */}
-        <div
-          className="absolute inset-y-0 w-0.5 bg-slate-700"
-          style={{ left: `${requiredPct}%` }}
-          title={`Required: ${gap.required_level}`}
-        />
-      </div>
-
-      <div className="flex justify-between mt-2 text-xs text-slate-500">
-        <span>
-          Your Level: <strong className="text-slate-700">{LEVEL_LABELS[gap.current_level]}</strong>
-          {gap.evidence_source && (
-            <span className="text-slate-400 italic ml-1">({gap.evidence_source})</span>
-          )}
-        </span>
-        <span>
-          Required: <strong className="text-slate-700">{LEVEL_LABELS[gap.required_level]}</strong>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Readiness ring
-// ---------------------------------------------------------------------------
-function ReadinessRing({ score }: { score: number }) {
-  const color = score >= 75 ? "#10b981" : score >= 50 ? "#6366f1" : score >= 25 ? "#f97316" : "#ef4444";
-  const r = 44;
-  const circ = 2 * Math.PI * r;
-  const dash = (score / 100) * circ;
-
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-28 h-28">
-        <svg width="112" height="112" viewBox="0 0 112 112" className="-rotate-90">
-          <circle cx="56" cy="56" r={r} fill="none" stroke="#e2e8f0" strokeWidth="10" />
-          <circle
-            cx="56" cy="56" r={r} fill="none"
-            stroke={color} strokeWidth="10"
-            strokeDasharray={`${dash} ${circ}`}
-            strokeLinecap="round"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold" style={{ color }}>{score}%</span>
-        </div>
-      </div>
-      <p className="text-xs text-slate-400 text-center mt-2 leading-snug">
-        Weighted competency readiness
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Stat card
-// ---------------------------------------------------------------------------
-function StatCard({ icon, label, value, color }: {
-  icon: React.ReactNode; label: string; value: number;
-  color: "red" | "emerald" | "orange";
+function Section({
+  title,
+  subtitle,
+  icon,
+  items,
+  expandedId,
+  setExpandedId,
+}: {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  items: CompetencyGap[];
+  expandedId: number | null;
+  setExpandedId: (id: number | null) => void;
 }) {
-  const colorMap = {
-    red: "bg-red-50 text-red-700 border-red-200",
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    orange: "bg-orange-50 text-orange-700 border-orange-200",
-  };
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm ${colorMap[color]}`}>
-      {icon}
-      <div>
-        <p className="text-xs opacity-70">{label}</p>
-        <p className="font-bold text-base leading-none">{value}</p>
+    <div className="mb-6">
+      <div className="flex items-center gap-2 mb-4">
+        {icon}
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+          <p className="text-xs text-slate-500">{subtitle}</p>
+        </div>
       </div>
+      <div className="space-y-3">
+        {items.map(gap => (
+          <CompetencyCard
+            key={gap.competency_id}
+            gap={gap}
+            isExpanded={expandedId === gap.competency_id}
+            onToggle={() => setExpandedId(expandedId === gap.competency_id ? null : gap.competency_id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Competency Card component
+// ---------------------------------------------------------------------------
+function CompetencyCard({
+  gap,
+  isExpanded,
+  onToggle,
+}: {
+  gap: CompetencyGap;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const classificationColors: Record<string, { bg: string; border: string; badge: string }> = {
+    strong_match: { bg: "bg-emerald-50", border: "border-emerald-200", badge: "bg-emerald-100 text-emerald-900" },
+    related: { bg: "bg-amber-50", border: "border-amber-200", badge: "bg-amber-100 text-amber-900" },
+    needs_verification: { bg: "bg-blue-50", border: "border-blue-200", badge: "bg-blue-100 text-blue-900" },
+    needs_development: { bg: "bg-orange-50", border: "border-orange-200", badge: "bg-orange-100 text-orange-900" },
+    missing_evidence: { bg: "bg-slate-50", border: "border-slate-200", badge: "bg-slate-100 text-slate-900" },
+  };
+
+  const colors = classificationColors[gap.classification] || classificationColors.missing_evidence;
+  const classificationLabel = gap.classification.replace(/_/g, " ").toUpperCase();
+
+  return (
+    <div className={`rounded-xl border ${colors.border} ${colors.bg} p-4 cursor-pointer transition-all hover:shadow-md`} onClick={onToggle}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold text-slate-900">{gap.competency_name}</h3>
+            <span className={`text-[11px] font-semibold px-2 py-1 rounded-full ${colors.badge}`}>
+              {classificationLabel}
+            </span>
+          </div>
+          <p className="text-xs text-slate-600">{gap.category}</p>
+        </div>
+        <button className="text-slate-500 hover:text-slate-700 shrink-0">
+          <Info size={16} />
+        </button>
+      </div>
+
+      {isExpanded && (
+        <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-slate-600 mb-2">EXPLANATION</p>
+            <p className="text-sm text-slate-700 leading-relaxed">{gap.explanation}</p>
+          </div>
+
+          {gap.evidence && (
+            <div>
+              <p className="text-xs font-semibold text-slate-600 mb-1">EVIDENCE</p>
+              <p className="text-sm text-slate-700 italic">{gap.evidence}</p>
+            </div>
+          )}
+
+          {gap.evidence_source && (
+            <div className="text-xs text-slate-500">
+              Source: {gap.evidence_source}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div>
+              <p className="text-slate-500 mb-1">Your Level</p>
+              <p className="font-semibold text-slate-900">{LEVEL_LABELS[gap.current_level]}</p>
+            </div>
+            <div>
+              <p className="text-slate-500 mb-1">Required Level</p>
+              <p className="font-semibold text-slate-900">{LEVEL_LABELS[gap.required_level]}</p>
+            </div>
+          </div>
+
+          {gap.confidence < 1 && (
+            <div className="bg-white/50 rounded border border-slate-200 p-2">
+              <p className="text-xs text-slate-600">
+                System confidence: <strong>{Math.round(gap.confidence * 100)}%</strong>
+              </p>
+            </div>
+          )}
+
+          {gap.classification === "needs_verification" && (
+            <button className="w-full text-sm font-semibold text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded transition-colors">
+              Take Quick Assessment
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
