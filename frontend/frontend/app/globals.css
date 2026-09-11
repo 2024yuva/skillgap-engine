@@ -7,8 +7,13 @@
   --accent-hover: #4f46e5;
 }
 
+/* Modern Custom Scrollbar System */
+
+/* Firefox support */
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #a5b4fc #f1f5f9;
 }
 
 body {
@@ -19,17 +24,99 @@ body {
   color: #0f172a;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+/* Chrome / Safari / Edge Webkit Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 
-/* Sidebar scrollbar */
-.sidebar-scroll::-webkit-scrollbar-thumb { background: #2d3250; }
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  border: 2px solid #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6366f1;
+}
+
+/* Custom Light Scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #818cf8 #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #818cf8;
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4f46e5;
+}
+
+/* Dark Sidebar Scrollbar */
+.sidebar-scroll, .dark-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0f1117;
+}
+
+.sidebar-scroll::-webkit-scrollbar,
+.dark-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track,
+.dark-scrollbar::-webkit-scrollbar-track {
+  background: #0f1117;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.dark-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+  border: 2px solid #0f1117;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.dark-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6366f1;
+}
+
+/* Thin horizontal / list scrollbars */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #818cf8;
+}
 
 /* Smooth transitions */
 .transition-all { transition: all 0.15s ease; }
 
 /* Drag-drop highlight */
 .drag-over { border-color: #6366f1 !important; background: #eef2ff !important; }
+

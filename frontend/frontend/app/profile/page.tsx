@@ -197,7 +197,7 @@ export default function ProfilePage() {
                   We found the following from your resume. You can add or remove items.
                 </p>
 
-                <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+                <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-1">
                   {/* Name + Education */}
                   {(parsed.name || parsed.education) && (
                     <section>

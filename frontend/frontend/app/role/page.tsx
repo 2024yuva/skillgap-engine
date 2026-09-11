@@ -135,7 +135,7 @@ export default function TargetRolePage() {
         {/* ------------------------------------------------------------------ */}
         {/* Left Filter Sidebar                                                  */}
         {/* ------------------------------------------------------------------ */}
-        <aside className="w-64 shrink-0 border-r border-slate-200 bg-white overflow-y-auto flex flex-col">
+        <aside className="w-64 shrink-0 border-r border-slate-200 bg-white overflow-y-auto flex flex-col custom-scrollbar">
           {/* Save alert */}
           <div className="px-4 py-3 border-b border-slate-100">
             <button className="flex items-center gap-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
@@ -252,7 +252,7 @@ export default function TargetRolePage() {
         {/* ------------------------------------------------------------------ */}
         {/* Main Content                                                         */}
         {/* ------------------------------------------------------------------ */}
-        <div className="flex-1 overflow-y-auto bg-[#f8fafc]">
+        <div className="flex-1 overflow-y-auto bg-[#f8fafc] custom-scrollbar">
           <div className="max-w-4xl mx-auto px-6 py-8">
             {/* Header */}
             <div className="mb-5">
@@ -274,7 +274,7 @@ export default function TargetRolePage() {
             </div>
 
             {/* Category tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-1 mb-5 scrollbar-none">
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-5 thin-scrollbar">
               {CATEGORY_TABS.map(cat => (
                 <button
                   key={cat}
