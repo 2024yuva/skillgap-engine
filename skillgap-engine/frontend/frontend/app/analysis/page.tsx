@@ -205,20 +205,27 @@ export default function AnalysisPage() {
               <p className="text-sm text-slate-400 text-center py-8">No competencies in this category.</p>
             )}
 
-            {/* Go to courses CTA */}
             <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-indigo-900">Ready for course recommendations?</p>
+                <p className="text-sm font-semibold text-indigo-900">Ready for the next step?</p>
                 <p className="text-xs text-indigo-600 mt-0.5">
-                  Courses ranked by how much of your remaining gap they close.
+                  Confirm uncertain DSA skills with an assessment, then view courses ranked by gap closure.
                 </p>
               </div>
-              <button
-                onClick={() => router.push("/courses")}
-                className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all"
-              >
-                View Courses
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => router.push("/assessment")}
+                  className="bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 text-sm font-semibold px-4 py-2 rounded-xl transition-all"
+                >
+                  Assessment
+                </button>
+                <button
+                  onClick={() => router.push("/courses")}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all"
+                >
+                  View Courses
+                </button>
+              </div>
             </div>
           </div>
         </div>
