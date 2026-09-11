@@ -125,74 +125,6 @@ export interface UserCompetency {
   competency: Competency;
 }
 
-export interface AssessmentQuestion {
-  id: string;
-  topic: string;
-  topic_label: string;
-  difficulty: number;
-  difficulty_label: string;
-  qtype: "concept" | "problem" | "tracing" | "coding";
-  prompt: string;
-  options?: string[];
-  starter?: string;
-}
-
-export interface AssessmentProgress {
-  answered: number;
-  max_questions: number;
-  remaining_seconds: number;
-  max_duration_seconds: number;
-}
-
-export interface AssessmentTopicResult {
-  topic: string;
-  label: string;
-  weight: number;
-  theta: number;
-  level: number;
-  band: string;
-  confidence: number;
-  asked: number;
-  correct: number;
-  next_steps: string[];
-}
-
-export interface AssessmentResult {
-  overall_level: number;
-  overall_label: string;
-  overall_band: string;
-  weighted_theta?: number;
-  topics: AssessmentTopicResult[];
-  biggest_gaps: { label: string; band: string }[];
-  next_steps: string[];
-  early_stop: boolean;
-  timed_out: boolean;
-  questions_asked: number;
-  review?: {
-    question_id: string;
-    topic: string;
-    topic_label: string;
-    prompt: string;
-    qtype: string;
-    correct: boolean;
-    explanation: string;
-    expected: string | null;
-  }[];
-}
-
-export interface AssessmentSession {
-  session_id?: string;
-  status: string;
-  completed: boolean;
-  assessment_name?: string;
-  seed_level?: number;
-  initial_difficulty?: string;
-  question?: AssessmentQuestion | null;
-  progress?: AssessmentProgress;
-  result?: AssessmentResult | null;
-  completed_at?: string | null;
-}
-
 export interface ParsedResumeProfile {
   name: string | null;
   education: string;
@@ -245,13 +177,5 @@ export const api = {
     },
     apply: (userId: number, body: { inferred_levels: Record<number, number>; name?: string; education?: string }) =>
       post<{ applied: number; user_id: number }>(`/resume/apply/${userId}`, body),
-  },
-  assessment: {
-    start: (userId: number, roleId: number) =>
-      post<AssessmentSession>("/assessment/start", { user_id: userId, role_id: roleId }),
-    submit: (sessionId: string, answer: string) =>
-      post<AssessmentSession>(`/assessment/${sessionId}/submit`, { answer }),
-    get: (sessionId: string) => get<AssessmentSession>(`/assessment/${sessionId}`),
-    latest: (userId: number) => get<AssessmentSession>(`/assessment/latest?user_id=${userId}`),
   },
 };

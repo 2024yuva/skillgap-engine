@@ -1,6 +1,6 @@
 """SQLAlchemy ORM models for SkillGap Engine."""
 
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 from sqlalchemy import (
     Column,
@@ -9,8 +9,6 @@ from sqlalchemy import (
     Text,
     Float,
     Date,
-    DateTime,
-    Boolean,
     ForeignKey,
     UniqueConstraint,
     CheckConstraint,
@@ -144,30 +142,3 @@ class CourseCompetency(Base):
 
     course = relationship("Course", back_populates="course_competencies")
     competency = relationship("Competency", back_populates="course_competencies")
-
-
-# ---------------------------------------------------------------------------
-# Assessment
-# ---------------------------------------------------------------------------
-
-class AssessmentAttempt(Base):
-    """Persisted DSA Skill Assessment attempt (adaptive session + results)."""
-
-    __tablename__ = "assessment_attempts"
-
-    id = Column(String(36), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
-    assessment_type = Column(String(50), nullable=False, default="dsa")
-    status = Column(String(30), nullable=False, default="in_progress")
-    started_at = Column(DateTime, nullable=False)
-    completed_at = Column(DateTime, nullable=True)
-    questions_asked = Column(Integer, nullable=False, default=0)
-    overall_level = Column(Integer, nullable=True)
-    overall_label = Column(String(50), nullable=True)
-    topic_results = Column(Text, nullable=True)
-    next_steps = Column(Text, nullable=True)
-    biggest_gaps = Column(Text, nullable=True)
-    session_blob = Column(Text, nullable=True)
-    early_stop = Column(Boolean, nullable=False, default=False)
-    applied = Column(Boolean, nullable=False, default=False)

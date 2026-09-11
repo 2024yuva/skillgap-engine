@@ -15,7 +15,6 @@ from app.database.connection import Base, engine, SessionLocal
 from app.models.models import (
     Competency, Role, RoleCompetency,
     User, UserCompetency, Course, CourseCompetency,
-    AssessmentAttempt,
 )
 from app.ingestion.seed_data import (
     COMPETENCIES, ROLES, ROLE_COMPETENCIES,
