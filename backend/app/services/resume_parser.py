@@ -2,7 +2,7 @@
 Resume parser service.
 
 Extracts text from PDF or DOCX, then matches against known competency names
-using both keyword heuristics and sentence-transformer semantic similarity.
+using keyword heuristics + skill normalization.
 
 Returns structured ExtractedProfile with:
   - name (if detectable)
@@ -12,7 +12,8 @@ Returns structured ExtractedProfile with:
   - soft_skills list
   - projects list
   - courses_certifications list
-  - matched_competency_ids  (competency IDs from our catalogue)
+  - matched_competency_ids  (canonical competency IDs from our catalogue)
+  - inferred_levels (dict[int, int])  — conservative level estimates
 """
 
 from __future__ import annotations
@@ -20,6 +21,9 @@ import io
 import re
 from dataclasses import dataclass, field
 from typing import Optional
+
+# Import the canonical normalization map
+from app.ingestion.seed_data import SKILL_NORMALIZATION_MAP
 
 # ---------------------------------------------------------------------------
 # Text extraction
@@ -98,70 +102,29 @@ def _split_sections(text: str) -> dict[str, list[str]]:
 
 
 # ---------------------------------------------------------------------------
-# Skill keyword bank  (competency_id -> list of keywords)
+# Skill matching via SKILL_NORMALIZATION_MAP
 # ---------------------------------------------------------------------------
 
-SKILL_KEYWORDS: dict[int, list[str]] = {
-    1:  ["programming", "coding", "algorithms", "variables", "loops", "functions"],
-    2:  ["python", "flask", "django", "fastapi", "pandas", "numpy", "matplotlib"],
-    3:  ["data structures", "algorithms", "dsa", "leetcode", "trees", "graphs", "sorting"],
-    4:  ["oop", "object oriented", "design patterns", "solid", "class", "inheritance"],
-    5:  ["git", "github", "gitlab", "version control", "branching", "pull request"],
-    6:  ["rest api", "api", "fastapi", "flask", "endpoint", "http", "openapi", "swagger"],
-    7:  ["sql", "mysql", "postgresql", "sqlite", "database", "queries", "orm", "sqlalchemy"],
-    8:  ["system design", "scalability", "microservices", "load balancing", "architecture"],
-    9:  ["aws", "azure", "gcp", "cloud", "ec2", "s3", "lambda", "deployment"],
-    10: ["linux", "bash", "shell", "ubuntu", "command line", "terminal", "unix"],
-    11: ["statistics", "probability", "hypothesis testing", "regression", "distributions"],
-    12: ["data wrangling", "data cleaning", "pandas", "etl", "data processing"],
-    13: ["visualization", "matplotlib", "seaborn", "tableau", "power bi", "plotly", "charts"],
-    14: ["machine learning", "ml", "scikit-learn", "sklearn", "classification", "clustering", "random forest", "xgboost"],
-    15: ["deep learning", "neural network", "cnn", "rnn", "pytorch", "tensorflow", "keras"],
-    16: ["feature engineering", "feature selection", "encoding", "scaling", "dimensionality"],
-    17: ["spark", "hadoop", "big data", "hive", "kafka", "distributed"],
-    18: ["official statistics", "census", "national accounts", "cpi", "gdp", "mospi", "nsso"],
-    19: ["sampling", "stratified sampling", "cluster sampling", "survey design"],
-    20: ["econometrics", "panel data", "time series", "causal inference", "iv estimation"],
-    21: ["circuit analysis", "kvl", "kcl", "thevenin", "ac circuit", "dc circuit"],
-    22: ["power systems", "transmission", "distribution", "load flow", "protection relay"],
-    23: ["control systems", "pid", "bode plot", "transfer function", "state space"],
-    24: ["electrical machines", "transformer", "induction motor", "synchronous machine"],
-    25: ["matlab", "simulink", "numerical computation"],
-    26: ["digital electronics", "logic gates", "flip flop", "fpga", "verilog", "vhdl"],
-    27: ["microcontroller", "arduino", "stm32", "arm", "embedded", "peripheral", "firmware"],
-    28: ["rtos", "freertos", "task scheduling", "semaphore", "real time"],
-    29: ["pcb", "kicad", "altium", "schematic", "pcb design", "eagle"],
-    30: ["signal processing", "dsp", "fourier", "filter", "fft"],
-    31: ["cad", "solidworks", "autocad", "catia", "3d modeling", "drafting"],
-    32: ["thermodynamics", "heat transfer", "refrigeration", "carnot"],
-    33: ["manufacturing", "machining", "casting", "welding", "cnc", "additive manufacturing"],
-    34: ["finite element", "fea", "ansys", "abaqus", "structural analysis simulation"],
-    35: ["fluid mechanics", "bernoulli", "pipe flow", "turbomachinery", "cfd"],
-    36: ["structural analysis", "beams", "trusses", "bending moment", "staad"],
-    37: ["geotechnical", "soil mechanics", "foundation design", "site investigation"],
-    38: ["project management", "gantt chart", "scheduling", "cost estimation", "agile", "scrum"],
-    39: ["gis", "arcgis", "qgis", "remote sensing", "spatial data"],
-    40: ["environmental engineering", "water treatment", "eia", "sustainability"],
-    41: ["project management", "agile", "scrum", "stakeholder", "planning"],
-    42: ["communication", "technical writing", "presentation", "report", "documentation"],
-    43: ["problem solving", "critical thinking", "root cause", "analytical"],
-    44: ["business", "domain knowledge", "kpi", "business process"],
-    45: ["data ethics", "privacy", "gdpr", "responsible ai", "bias", "fairness"],
-    46: ["research", "literature review", "experimental design", "research methodology"],
-    47: ["mathematical modelling", "linear algebra", "calculus", "differential equations"],
-    48: ["iot", "mqtt", "sensor", "raspberry pi", "edge computing", "coap"],
-    49: ["c programming", "c++", "cpp", "pointers", "memory management", "embedded c"],
-    50: ["docker", "devops", "ci/cd", "github actions", "kubernetes", "pipeline"],
-}
-
-
 def _match_competencies_by_keywords(text: str) -> list[int]:
+    """
+    Match the resume text against the canonical SKILL_NORMALIZATION_MAP.
+    Returns a deduplicated list of canonical competency IDs found.
+
+    Normalization ensures that 'Python', 'Python Programming', 'Python Scripting',
+    'Pandas', 'NumPy' etc. all map to the same canonical competency ID (3).
+    """
     text_lower = text.lower()
-    matched = []
-    for comp_id, keywords in SKILL_KEYWORDS.items():
-        if any(kw in text_lower for kw in keywords):
-            matched.append(comp_id)
-    return matched
+    matched_ids: set[int] = set()
+
+    # Sort by keyword length descending so longer phrases match before substrings
+    sorted_keywords = sorted(SKILL_NORMALIZATION_MAP.keys(), key=len, reverse=True)
+    for kw in sorted_keywords:
+        # Use word-boundary-aware search to avoid partial matches
+        pattern = r'(?<![a-z0-9])' + re.escape(kw) + r'(?![a-z0-9])'
+        if re.search(pattern, text_lower):
+            matched_ids.add(SKILL_NORMALIZATION_MAP[kw])
+
+    return list(matched_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -257,12 +220,12 @@ def parse_resume(filename: str, data: bytes) -> ExtractedProfile:
         if TECH_SECTION_MARKERS.search(token) and token not in tech_skills:
             tech_skills.append(token)
 
-    # Match competencies across full text
+    # Match competencies across full text using normalization map
     matched_ids = _match_competencies_by_keywords(text)
 
     # Infer competency levels conservatively
+    # If mentioned in projects/experience section -> level 3 (intermediate)
     # If mentioned in skills section -> level 2 (basic)
-    # If mentioned in projects/experience -> level 3 (intermediate)
     # Otherwise -> level 1 (awareness)
     skills_lower = " ".join(skill_lines).lower()
     proj_exp_lower = " ".join(
@@ -271,9 +234,10 @@ def parse_resume(filename: str, data: bytes) -> ExtractedProfile:
 
     inferred: dict[int, int] = {}
     for comp_id in matched_ids:
-        keywords = SKILL_KEYWORDS.get(comp_id, [])
-        in_skills = any(kw in skills_lower for kw in keywords)
-        in_proj = any(kw in proj_exp_lower for kw in keywords)
+        # Find keywords for this competency from the normalization map
+        comp_keywords = [kw for kw, cid in SKILL_NORMALIZATION_MAP.items() if cid == comp_id]
+        in_skills = any(kw in skills_lower for kw in comp_keywords)
+        in_proj = any(kw in proj_exp_lower for kw in comp_keywords)
         if in_proj:
             inferred[comp_id] = 3
         elif in_skills:

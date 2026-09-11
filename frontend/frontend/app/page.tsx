@@ -104,7 +104,7 @@ export default function SignUpPage() {
 
         <div className="relative z-10">
           <div className="flex gap-6 text-center">
-            {[["7", "Domains"], ["50+", "Competencies"], ["36", "Courses"]].map(([n, l]) => (
+            {[["8", "Roles"], ["50+", "Competencies"], ["59", "Courses"]].map(([n, l]) => (
               <div key={l}>
                 <p className="text-2xl font-bold text-indigo-400">{n}</p>
                 <p className="text-xs text-slate-500">{l}</p>

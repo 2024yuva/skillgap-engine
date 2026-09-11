@@ -173,12 +173,9 @@ function CourseRow({ rec, rank }: { rec: CourseRecommendation; rank: number }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3 mb-2">
             <h3 className="text-sm font-bold text-slate-800 leading-snug">{course.title}</h3>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${impactColor}`}>
-                {impactLabel} Impact
-              </span>
-              <span className="text-xs font-mono text-slate-400">{impact_score.toFixed(3)}</span>
-            </div>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ${impactColor}`}>
+              {impactLabel} Impact
+            </span>
           </div>
 
           {/* Meta chips */}

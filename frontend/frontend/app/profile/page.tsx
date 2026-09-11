@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import { api, type ParsedResumeProfile } from "@/lib/api";
+import { api, type ParsedResumeProfile, type Competency } from "@/lib/api";
 import { getSession, setSession, getSelectedRole } from "@/lib/session";
 import {
   Upload, FileText, CheckCircle2, AlertCircle, Edit3,
@@ -33,8 +33,20 @@ export default function ProfilePage() {
   const [editedSoftSkills, setEditedSoftSkills] = useState<string[]>([]);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [competencyNames, setCompetencyNames] = useState<Record<number, string>>({});
 
   const selectedRole = typeof window !== "undefined" ? getSelectedRole() : null;
+
+  // Fetch competency names for the inferred levels preview
+  useEffect(() => {
+    api.competencies.list()
+      .then(comps => {
+        const map: Record<number, string> = {};
+        comps.forEach(c => { map[c.id] = c.name; });
+        setCompetencyNames(map);
+      })
+      .catch(() => {});
+  }, []);
 
   function onDragOver(e: React.DragEvent) { e.preventDefault(); setDragging(true); }
   function onDragLeave() { setDragging(false); }
@@ -55,10 +67,34 @@ export default function ProfilePage() {
       setParsed(result);
       setEditedSkills(result.technical_skills);
       setEditedSoftSkills(result.soft_skills);
-      // Update session name if detected
-      if (result.name && session) {
-        setSession({ ...session, name: result.name, education: result.education || session.education });
+
+      let currentSession = session;
+      if (!currentSession) {
+        const newUser = await api.users.create({
+          name: result.name || file.name.split(".")[0],
+          education: result.education || undefined,
+        });
+        currentSession = { id: newUser.id, name: newUser.name, education: newUser.education ?? undefined };
+        setSession(currentSession);
+      } else if (result.name) {
+        currentSession = { ...currentSession, name: result.name, education: result.education || currentSession.education };
+        setSession(currentSession);
       }
+
+      // Auto-apply skills to user session
+      const levels: Record<number, number> = {};
+      for (const [k, v] of Object.entries(result.inferred_levels)) {
+        levels[Number(k)] = v;
+      }
+      await api.resume.apply(currentSession.id, {
+        inferred_levels: levels,
+        name: result.name ?? undefined,
+        education: result.education || undefined,
+      });
+
+      setApplied(true);
+      // Navigate directly to target role selection
+      router.push("/role");
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Parsing failed.");
     } finally {
@@ -80,12 +116,14 @@ export default function ProfilePage() {
         education: parsed.education || undefined,
       });
       setApplied(true);
+      router.push("/role");
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Failed to apply.");
     } finally {
       setApplying(false);
     }
   }
+
 
   function addManualSkill() {
     const s = skillInput.trim();
@@ -258,15 +296,23 @@ export default function ProfilePage() {
                   {/* Inferred levels preview */}
                   <section>
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Inferred Competency Levels</h3>
-                    <div className="space-y-1">
-                      {Object.entries(parsed.inferred_levels).slice(0, 5).map(([id, level]) => (
-                        <div key={id} className="flex items-center justify-between">
-                          <span className="text-xs text-slate-600">Competency #{id}</span>
-                          <span className="text-xs font-medium text-indigo-600">{LEVEL_LABELS[level]}</span>
-                        </div>
-                      ))}
-                      {Object.keys(parsed.inferred_levels).length > 5 && (
-                        <p className="text-xs text-slate-400">+{Object.keys(parsed.inferred_levels).length - 5} more</p>
+                    <div className="space-y-1.5">
+                      {Object.entries(parsed.inferred_levels).slice(0, 6).map(([id, level]) => {
+                        const name = competencyNames[Number(id)] ?? `Competency #${id}`;
+                        return (
+                          <div key={id} className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-slate-600 truncate">{name}</span>
+                            <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full shrink-0">
+                              {LEVEL_LABELS[level]}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {Object.keys(parsed.inferred_levels).length > 6 && (
+                        <p className="text-xs text-slate-400">+{Object.keys(parsed.inferred_levels).length - 6} more competencies detected</p>
+                      )}
+                      {Object.keys(parsed.inferred_levels).length === 0 && (
+                        <p className="text-xs text-slate-400">No competencies matched from this resume.</p>
                       )}
                     </div>
                   </section>

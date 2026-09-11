@@ -3,20 +3,114 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import { api, type GapAnalysisResult, type CompetencyGap } from "@/lib/api";
+import {
+  api,
+  type GapAnalysisResult,
+  type CompetencyGap,
+} from "@/lib/api";
 import { getSession, getSelectedRole } from "@/lib/session";
-import { AlertTriangle, TrendingDown, CheckCircle2, Info } from "lucide-react";
+import {
+  CheckCircle2,
+  GitMerge,
+  HelpCircle,
+  TrendingUp,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  BookOpen,
+  ClipboardCheck,
+  Info,
+  Loader2,
+  ArrowRight,
+} from "lucide-react";
 
-const LEVEL_LABELS = ["No Evidence", "Awareness", "Basic", "Intermediate", "Advanced", "Expert"];
-const MAX_LEVEL = 5;
+// ─── Status config ──────────────────────────────────────────────────────────
+type Status = CompetencyGap["status"];
+
+const STATUS_CONFIG: Record<
+  Status,
+  {
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    label: string;
+    color: string;        // Tailwind text colour
+    bg: string;           // Tailwind bg colour for badge
+    border: string;       // Tailwind left-border colour
+    ring: string;         // card ring
+  }
+> = {
+  strong_match: {
+    icon: CheckCircle2,
+    label: "Strong Match",
+    color: "text-emerald-700",
+    bg: "bg-emerald-100",
+    border: "border-l-emerald-500",
+    ring: "border-emerald-200",
+  },
+  related: {
+    icon: GitMerge,
+    label: "Related / Transferable",
+    color: "text-blue-700",
+    bg: "bg-blue-100",
+    border: "border-l-blue-500",
+    ring: "border-blue-200",
+  },
+  needs_verification: {
+    icon: HelpCircle,
+    label: "Needs Verification",
+    color: "text-yellow-700",
+    bg: "bg-yellow-100",
+    border: "border-l-yellow-500",
+    ring: "border-yellow-200",
+  },
+  needs_development: {
+    icon: TrendingUp,
+    label: "Needs Development",
+    color: "text-orange-700",
+    bg: "bg-orange-100",
+    border: "border-l-orange-500",
+    ring: "border-orange-200",
+  },
+  missing: {
+    icon: AlertCircle,
+    label: "Missing Evidence",
+    color: "text-slate-500",
+    bg: "bg-slate-100",
+    border: "border-l-slate-400",
+    ring: "border-slate-200",
+  },
+};
+
+const STATUS_ORDER: Status[] = [
+  "strong_match",
+  "related",
+  "needs_verification",
+  "needs_development",
+  "missing",
+];
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function groupByStatus(gaps: CompetencyGap[]) {
+  const groups: Record<Status, CompetencyGap[]> = {
+    strong_match: [],
+    related: [],
+    needs_verification: [],
+    needs_development: [],
+    missing: [],
+  };
+  for (const g of gaps) {
+    groups[g.status].push(g);
+  }
+  return groups;
+}
 
 export default function AnalysisPage() {
   const router = useRouter();
   const [result, setResult] = useState<GapAnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [showAll, setShowAll] = useState(false);
+  const [activeSection, setActiveSection] = useState<Status | "all">("all");
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const session = getSession();
@@ -26,33 +120,34 @@ export default function AnalysisPage() {
 
     api.analysis.gaps(session.id, role.id)
       .then(setResult)
-      .catch(e => setError(e.message))
+      .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [router]);
 
-  const categories = useMemo(() => {
-    if (!result) return [];
-    const cats = Array.from(new Set(result.gaps.map(g => g.category)));
-    return ["All", ...cats.sort()];
-  }, [result]);
+  const groups = useMemo(() => result ? groupByStatus(result.gaps) : null, [result]);
 
-  const filtered = useMemo(() => {
-    if (!result) return [];
-    const f = categoryFilter === "All" ? result.gaps : result.gaps.filter(g => g.category === categoryFilter);
-    return showAll ? f : f.slice(0, 8);
-  }, [result, categoryFilter, showAll]);
+  const visibleGaps = useMemo(() => {
+    if (!result || !groups) return [];
+    if (activeSection === "all") return result.gaps;
+    return groups[activeSection] ?? [];
+  }, [result, groups, activeSection]);
 
-  const totalFiltered = useMemo(() => {
-    if (!result) return 0;
-    return categoryFilter === "All" ? result.gaps.length : result.gaps.filter(g => g.category === categoryFilter).length;
-  }, [result, categoryFilter]);
+  function toggleExpand(id: number) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
+  // ── Loading ────────────────────────────────────────────────────────────
   if (loading) return (
     <AppShell>
       <div className="flex items-center justify-center h-full min-h-96">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-slate-500">Running competency gap analysis...</p>
+          <Loader2 size={32} className="text-indigo-500 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-slate-500">Analysing your competencies…</p>
         </div>
       </div>
     </AppShell>
@@ -61,7 +156,7 @@ export default function AnalysisPage() {
   if (error) return (
     <AppShell>
       <div className="max-w-lg mx-auto px-6 py-16 text-center">
-        <AlertTriangle size={32} className="text-red-400 mx-auto mb-3" />
+        <AlertCircle size={32} className="text-red-400 mx-auto mb-3" />
         <p className="text-red-600 text-sm font-medium">{error}</p>
         <button onClick={() => router.push("/role")} className="mt-4 text-indigo-600 text-sm hover:underline">
           Select a role first
@@ -70,285 +165,307 @@ export default function AnalysisPage() {
     </AppShell>
   );
 
-  if (!result) return null;
+  if (!result || !groups) return null;
 
-  const highPriority = result.gaps.filter(g => g.priority_score >= 0.3 && g.gap > 0);
+  const { strong_match_count, related_count, needs_verification_count, needs_development_count, missing_count } = result;
+
+  // Next steps list
+  const nextSteps: { label: string; desc: string }[] = [];
+  if (needs_verification_count > 0)
+    nextSteps.push({ label: "Verify your skills", desc: `${needs_verification_count} competency${needs_verification_count > 1 ? "ies" : ""} need a quick assessment` });
+  if (groups.needs_verification.some(g => g.competency_id === 4))
+    nextSteps.push({ label: "Take the DSA Assessment", desc: "Demonstrate your Data Structures & Algorithms proficiency" });
+  if (needs_development_count > 0)
+    nextSteps.push({ label: "Build your development plan", desc: `${needs_development_count} competency${needs_development_count > 1 ? "ies" : ""} need focused improvement` });
+  if (missing_count > 0)
+    nextSteps.push({ label: "Explore missing skills", desc: "Find resources for skills not yet on your profile" });
+  nextSteps.push({ label: "View course recommendations", desc: "Courses ranked to close your most important gaps first" });
 
   return (
     <AppShell>
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Your Competency Profile</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {result.user_name} &nbsp;&#8594;&nbsp; <span className="font-semibold text-indigo-600">{result.role_name}</span>
-            </p>
-          </div>
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
 
-          {/* Summary stats */}
-          <div className="flex gap-3 flex-wrap">
-            <StatCard icon={<TrendingDown size={14} />} label="Gaps" value={result.gap_count} color="red" />
-            <StatCard icon={<CheckCircle2 size={14} />} label="Met" value={result.covered_count} color="emerald" />
-            <StatCard icon={<AlertTriangle size={14} />} label="High Priority" value={highPriority.length} color="orange" />
-          </div>
-        </div>
+        {/* ── Hero header ─────────────────────────────────────────────────── */}
+        <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-100 p-6">
+          <p className="text-xs font-semibold text-indigo-500 uppercase tracking-widest mb-1">
+            Your Path to
+          </p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1">
+            {result.role_name}
+          </h1>
+          <p className="text-sm text-slate-500 mb-5">
+            {result.user_name} &nbsp;·&nbsp; {result.gaps.length} competencies analysed
+          </p>
 
-        {/* Two column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: summary + readiness */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Readiness score */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                Readiness Score <span className="text-slate-300 normal-case font-normal">(secondary)</span>
-              </p>
-              <ReadinessRing score={result.readiness_score} />
-            </div>
-
-            {/* Priority Legend */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Priority Guide</p>
-              <div className="space-y-2 text-xs">
-                {[
-                  { color: "bg-red-500", label: "Critical gap", range: "Priority >= 0.5" },
-                  { color: "bg-orange-400", label: "High gap", range: "Priority 0.3-0.5" },
-                  { color: "bg-yellow-400", label: "Medium gap", range: "Priority 0.1-0.3" },
-                  { color: "bg-emerald-400", label: "Met or minor", range: "Priority < 0.1" },
-                ].map(({ color, label, range }) => (
-                  <div key={label} className="flex items-center gap-2.5">
-                    <div className={`w-2.5 h-2.5 rounded-sm shrink-0 ${color}`} />
-                    <div>
-                      <p className="text-slate-700 font-medium">{label}</p>
-                      <p className="text-slate-400">{range}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 pt-3 border-t border-slate-100">
-                <p className="text-xs text-slate-400">
-                  Priority = (gap / 5) &times; importance
-                </p>
-              </div>
-            </div>
-
-            {/* High priority callout */}
-            {highPriority.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-red-700 font-medium">
-                    You have <strong>{highPriority.length} high-priority skill gap{highPriority.length > 1 ? "s" : ""}</strong> to reach your target role.
-                  </p>
-                </div>
-                <div className="mt-2 space-y-1">
-                  {highPriority.slice(0, 3).map(g => (
-                    <p key={g.competency_id} className="text-xs text-red-600 pl-4">
-                      {g.competency_name}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right: competency bars */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Category filter */}
-            <div className="flex flex-wrap gap-2">
-              {categories.map(cat => (
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {(
+              [
+                ["strong_match",       strong_match_count],
+                ["related",            related_count],
+                ["needs_verification", needs_verification_count],
+                ["needs_development",  needs_development_count],
+                ["missing",            missing_count],
+              ] as [Status, number][]
+            ).map(([s, count]) => {
+              const cfg = STATUS_CONFIG[s];
+              const Icon = cfg.icon;
+              const isActive = activeSection === s;
+              return (
                 <button
-                  key={cat}
-                  onClick={() => { setCategoryFilter(cat); setShowAll(false); }}
-                  className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${
-                    categoryFilter === cat
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                  key={s}
+                  onClick={() => setActiveSection(isActive ? "all" : s)}
+                  className={`rounded-xl p-3 border text-left transition-all ${
+                    isActive
+                      ? `${cfg.bg} ${cfg.ring} border-2`
+                      : "bg-white border-slate-200 hover:border-indigo-200"
                   }`}
                 >
-                  {cat}
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Icon size={13} className={cfg.color} />
+                    <span className={`text-xs font-semibold ${cfg.color}`}>{count}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-tight">{cfg.label}</p>
                 </button>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
-            {/* Legend */}
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-indigo-500" />
-                Your Level
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-red-200" />
-                Gap
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-0.5 h-3 bg-slate-700" />
-                Required Level
-              </div>
-            </div>
+          {activeSection !== "all" && (
+            <button
+              onClick={() => setActiveSection("all")}
+              className="mt-3 text-xs text-indigo-600 hover:underline"
+            >
+              ← Show all competencies
+            </button>
+          )}
+        </div>
 
-            {/* Bars */}
-            <div className="space-y-3">
-              {filtered.map(g => <CompetencyRow key={g.competency_id} gap={g} />)}
-            </div>
+        {/* ── Competency list ──────────────────────────────────────────────── */}
+        <div className="space-y-3">
+          {visibleGaps.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-8">
+              No competencies in this category.
+            </p>
+          )}
+          {visibleGaps.map((g) => (
+            <CompetencyCard
+              key={g.competency_id}
+              gap={g}
+              expanded={expandedIds.has(g.competency_id)}
+              onToggle={() => toggleExpand(g.competency_id)}
+              onAssess={() => router.push(`/assessment?competency=${g.competency_id}`)}
+              onLearn={() => router.push("/courses")}
+            />
+          ))}
+        </div>
 
-            {totalFiltered > filtered.length && (
-              <button
-                onClick={() => setShowAll(true)}
-                className="text-sm text-indigo-600 hover:underline font-medium"
-              >
-                Show all {totalFiltered} competencies
-              </button>
-            )}
+        {/* ── Next steps ──────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <ArrowRight size={16} className="text-indigo-500" />
+            Your Next Steps
+          </h2>
+          <ol className="space-y-3">
+            {nextSteps.map((step, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  {i + 1}
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">{step.label}</p>
+                  <p className="text-xs text-slate-500">{step.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
 
-            {filtered.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-8">No competencies in this category.</p>
-            )}
-
-            {/* Go to courses CTA */}
-            <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-indigo-900">Ready for course recommendations?</p>
-                <p className="text-xs text-indigo-600 mt-0.5">
-                  Courses ranked by how much of your remaining gap they close.
-                </p>
-              </div>
-              <button
-                onClick={() => router.push("/courses")}
-                className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all"
-              >
-                View Courses
-              </button>
-            </div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              onClick={() => router.push("/assessment")}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all"
+            >
+              Take DSA Assessment
+            </button>
+            <button
+              onClick={() => router.push("/courses")}
+              className="bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-sm font-semibold px-4 py-2 rounded-xl transition-all"
+            >
+              View Course Recommendations
+            </button>
           </div>
         </div>
+
+        {/* ── Readiness (secondary, collapsed) ────────────────────────────── */}
+        <details className="group">
+          <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-600 list-none flex items-center gap-1 select-none">
+            <Info size={12} />
+            View readiness score (secondary metric)
+          </summary>
+          <div className="mt-2 bg-slate-50 rounded-xl border border-slate-200 p-4 text-center">
+            <p className="text-3xl font-bold text-indigo-600">{result.readiness_score}%</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Weighted competency readiness — proportion of required levels already achieved.
+              This is a secondary metric; the classifications above are the primary guidance.
+            </p>
+          </div>
+        </details>
       </div>
     </AppShell>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Competency row component
-// ---------------------------------------------------------------------------
-function CompetencyRow({ gap }: { gap: CompetencyGap }) {
-  const currentPct = (gap.current_level / MAX_LEVEL) * 100;
-  const requiredPct = (gap.required_level / MAX_LEVEL) * 100;
-  const gapPct = Math.max(requiredPct - currentPct, 0);
+// ─── Competency Card ─────────────────────────────────────────────────────────
 
-  const priorityColor =
-    gap.priority_score >= 0.5 ? "border-l-red-500" :
-    gap.priority_score >= 0.3 ? "border-l-orange-400" :
-    gap.priority_score >= 0.1 ? "border-l-yellow-400" :
-    "border-l-emerald-400";
-
-  const gapTextColor =
-    gap.gap === 0 ? "text-emerald-600" :
-    gap.gap <= 1 ? "text-yellow-600" :
-    gap.gap <= 2 ? "text-orange-600" : "text-red-600";
-
-  return (
-    <div className={`bg-white rounded-xl border border-slate-200 border-l-4 ${priorityColor} p-4 shadow-sm`}>
-      <div className="flex items-start justify-between gap-3 mb-2.5">
-        <div>
-          <p className="text-sm font-semibold text-slate-800">{gap.competency_name}</p>
-          <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-medium">
-            {gap.category}
-          </span>
-        </div>
-        <div className="text-right shrink-0">
-          <span className={`text-sm font-bold ${gapTextColor}`}>
-            {gap.gap === 0 ? "Met" : `Gap: ${gap.gap}`}
-          </span>
-          <p className="text-[10px] text-slate-400 mt-0.5">priority {gap.priority_score.toFixed(3)}</p>
-        </div>
-      </div>
-
-      {/* Stacked progress bar */}
-      <div className="relative h-3.5 rounded-full bg-slate-100 overflow-hidden">
-        <div
-          className="absolute inset-y-0 left-0 rounded-l-full bg-indigo-500"
-          style={{ width: `${currentPct}%` }}
-        />
-        {gapPct > 0 && (
-          <div
-            className="absolute inset-y-0 bg-red-200"
-            style={{ left: `${currentPct}%`, width: `${gapPct}%` }}
-          />
-        )}
-        {/* Required marker */}
-        <div
-          className="absolute inset-y-0 w-0.5 bg-slate-700"
-          style={{ left: `${requiredPct}%` }}
-          title={`Required: ${gap.required_level}`}
-        />
-      </div>
-
-      <div className="flex justify-between mt-2 text-xs text-slate-500">
-        <span>
-          Your Level: <strong className="text-slate-700">{LEVEL_LABELS[gap.current_level]}</strong>
-          {gap.evidence_source && (
-            <span className="text-slate-400 italic ml-1">({gap.evidence_source})</span>
-          )}
-        </span>
-        <span>
-          Required: <strong className="text-slate-700">{LEVEL_LABELS[gap.required_level]}</strong>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Readiness ring
-// ---------------------------------------------------------------------------
-function ReadinessRing({ score }: { score: number }) {
-  const color = score >= 75 ? "#10b981" : score >= 50 ? "#6366f1" : score >= 25 ? "#f97316" : "#ef4444";
-  const r = 44;
-  const circ = 2 * Math.PI * r;
-  const dash = (score / 100) * circ;
-
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-28 h-28">
-        <svg width="112" height="112" viewBox="0 0 112 112" className="-rotate-90">
-          <circle cx="56" cy="56" r={r} fill="none" stroke="#e2e8f0" strokeWidth="10" />
-          <circle
-            cx="56" cy="56" r={r} fill="none"
-            stroke={color} strokeWidth="10"
-            strokeDasharray={`${dash} ${circ}`}
-            strokeLinecap="round"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold" style={{ color }}>{score}%</span>
-        </div>
-      </div>
-      <p className="text-xs text-slate-400 text-center mt-2 leading-snug">
-        Weighted competency readiness
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Stat card
-// ---------------------------------------------------------------------------
-function StatCard({ icon, label, value, color }: {
-  icon: React.ReactNode; label: string; value: number;
-  color: "red" | "emerald" | "orange";
+function CompetencyCard({
+  gap,
+  expanded,
+  onToggle,
+  onAssess,
+  onLearn,
+}: {
+  gap: CompetencyGap;
+  expanded: boolean;
+  onToggle: () => void;
+  onAssess: () => void;
+  onLearn: () => void;
 }) {
-  const colorMap = {
-    red: "bg-red-50 text-red-700 border-red-200",
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    orange: "bg-orange-50 text-orange-700 border-orange-200",
-  };
+  const cfg = STATUS_CONFIG[gap.status];
+  const Icon = cfg.icon;
+
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm ${colorMap[color]}`}>
-      {icon}
-      <div>
-        <p className="text-xs opacity-70">{label}</p>
-        <p className="font-bold text-base leading-none">{value}</p>
+    <div
+      className={`bg-white rounded-xl border border-l-4 ${cfg.border} ${cfg.ring} border shadow-sm transition-all`}
+    >
+      {/* Card header — always visible */}
+      <div
+        onClick={onToggle}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onToggle()}
+        role="button"
+        tabIndex={0}
+        className="w-full text-left p-4 flex items-start justify-between gap-3 cursor-pointer select-none"
+        aria-expanded={expanded}
+      >
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <Icon size={16} className={`${cfg.color} mt-0.5 shrink-0`} />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-800 truncate">
+              {gap.competency_name}
+            </p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>
+                {cfg.label}
+              </span>
+              <span className="text-[11px] text-slate-400">{gap.category}</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Quick action button */}
+          {gap.status === "needs_verification" || gap.status === "related" ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onAssess(); }}
+              className="hidden sm:flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-all"
+            >
+              <ClipboardCheck size={11} />
+              {gap.action_label}
+            </button>
+          ) : gap.status === "needs_development" || gap.status === "missing" ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onLearn(); }}
+              className="hidden sm:flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg transition-all"
+            >
+              <BookOpen size={11} />
+              {gap.action_label}
+            </button>
+          ) : null}
+          {expanded
+            ? <ChevronUp size={14} className="text-slate-400" />
+            : <ChevronDown size={14} className="text-slate-400" />
+          }
+        </div>
       </div>
+
+
+      {/* Expanded content */}
+      {expanded && (
+        <div className="px-4 pb-4 pt-0 border-t border-slate-100 mt-0">
+          {/* Why this classification */}
+          <div className="mt-3 mb-3">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+              Why we classified this
+            </p>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              {gap.status_reason}
+            </p>
+          </div>
+
+          {/* Evidence bullets */}
+          {gap.evidence_bullets && gap.evidence_bullets.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                Evidence found
+              </p>
+              <ul className="space-y-1">
+                {gap.evidence_bullets.map((b, i) => (
+                  <li key={i} className="text-xs text-slate-600 flex items-start gap-1.5">
+                    <span className="text-emerald-500 mt-0.5">✓</span>
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Related skill callout */}
+          {gap.related_skill_name && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs text-blue-700">
+                <span className="font-semibold">Related skill detected:</span>{" "}
+                {gap.related_skill_name} — your experience here is transferable.
+              </p>
+            </div>
+          )}
+
+          {/* Confidence */}
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-slate-500">System confidence</span>
+            <div className="flex items-center gap-2">
+              <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-indigo-400 transition-all"
+                  style={{ width: `${Math.round(gap.confidence * 100)}%` }}
+                />
+              </div>
+              <span className="text-xs text-slate-500 w-8 text-right">
+                {Math.round(gap.confidence * 100)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Mobile action buttons */}
+          <div className="flex gap-2 flex-wrap">
+            {(gap.status === "needs_verification" || gap.status === "related") && (
+              <button
+                onClick={onAssess}
+                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <ClipboardCheck size={12} />
+                {gap.action_label}
+              </button>
+            )}
+            {(gap.status === "needs_development" || gap.status === "missing") && (
+              <button
+                onClick={onLearn}
+                className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <BookOpen size={12} />
+                {gap.action_label}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

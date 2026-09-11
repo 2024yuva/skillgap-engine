@@ -79,6 +79,14 @@ export interface CompetencyGap {
   importance: number;
   priority_score: number;
   evidence_source: string | null;
+  // User-facing classification fields
+  status: "strong_match" | "related" | "needs_verification" | "needs_development" | "missing";
+  status_label: string;
+  status_reason: string;
+  related_skill_name: string | null;
+  confidence: number;
+  action_label: string;
+  evidence_bullets: string[];
 }
 
 export interface GapAnalysisResult {
@@ -90,6 +98,11 @@ export interface GapAnalysisResult {
   covered_count: number;
   gap_count: number;
   readiness_score: number;
+  strong_match_count: number;
+  related_count: number;
+  needs_verification_count: number;
+  needs_development_count: number;
+  missing_count: number;
 }
 
 export interface Course {
@@ -137,6 +150,62 @@ export interface ParsedResumeProfile {
   inferred_levels: Record<string, number>;
 }
 
+export interface AssessmentQuestion {
+  id: number;
+  topic: string;
+  question_text: string;
+  question_type: "mcq" | "trace" | "complexity";
+  options: string[] | null;
+  correct_answer: string;
+  explanation: string;
+  difficulty: "easy" | "medium" | "hard";
+}
+
+export interface TopicResult {
+  topic: string;
+  score: number;
+  label: string;
+  questions_attempted: number;
+  questions_correct: number;
+}
+
+export interface AssessmentResult {
+  user_id: number;
+  competency_id: number;
+  competency_name: string;
+  overall_score: number;
+  verified_level: number;
+  topic_results: TopicResult[];
+  summary: string;
+  strongest_topics: string[];
+  development_areas: string[];
+}
+
+export interface RoleMatch {
+  id: number;
+  name: string;
+  sector: string;
+  description: string | null;
+  match_score: number;
+  matched_count: number;
+  total_required: number;
+  matched_skills: string[];
+  missing_skills: string[];
+}
+
+export interface CompanyJobMatch {
+  company_name: string;
+  about_role: string;
+  category: string;
+  required_skills: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  match_score: number;
+  working_duration: string;
+  application_link: string;
+  salary_lpa: string;
+}
+
 // ---------------------------------------------------------------------------
 // API calls
 // ---------------------------------------------------------------------------
@@ -152,6 +221,8 @@ export const api = {
   roles: {
     list: () => get<Role[]>("/roles/"),
     get: (id: number) => get<Role>(`/roles/${id}`),
+    matches: (userId: number) => get<RoleMatch[]>(`/roles/matches/${userId}`),
+    companyMatches: (userId: number) => get<CompanyJobMatch[]>(`/roles/company-matches/${userId}`),
   },
   competencies: {
     list: () => get<Competency[]>("/competencies/"),
@@ -178,4 +249,11 @@ export const api = {
     apply: (userId: number, body: { inferred_levels: Record<number, number>; name?: string; education?: string }) =>
       post<{ applied: number; user_id: number }>(`/resume/apply/${userId}`, body),
   },
+  assessment: {
+    questions: (competencyId = 4) =>
+      get<AssessmentQuestion[]>(`/assessment/questions?competency_id=${competencyId}`),
+    submit: (body: { user_id: number; competency_id: number; answers: Record<number, string> }) =>
+      post<AssessmentResult>("/assessment/submit", body),
+  },
 };
+
