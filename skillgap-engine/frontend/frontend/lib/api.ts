@@ -1,17 +1,13 @@
 /**
- * API client — thin fetch wrappers for all backend endpoints.
- * Base URL reads from NEXT_PUBLIC_API_URL or defaults to localhost:8000.
+ * Typed API client for SkillGap Engine backend.
  */
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`GET ${path} → ${res.status}: ${text}`);
-  }
-  return res.json() as Promise<T>;
+  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+  return res.json();
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -22,9 +18,9 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`POST ${path} → ${res.status}: ${text}`);
+    throw new Error(`POST ${path} failed: ${res.status} ${text}`);
   }
-  return res.json() as Promise<T>;
+  return res.json();
 }
 
 async function put<T>(path: string, body: unknown): Promise<T> {
@@ -33,11 +29,8 @@ async function put<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`PUT ${path} → ${res.status}: ${text}`);
-  }
-  return res.json() as Promise<T>;
+  if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`);
+  return res.json();
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +125,18 @@ export interface UserCompetency {
   competency: Competency;
 }
 
+export interface ParsedResumeProfile {
+  name: string | null;
+  education: string;
+  experience_summary: string;
+  technical_skills: string[];
+  soft_skills: string[];
+  projects: string[];
+  courses_certifications: string[];
+  matched_competency_ids: number[];
+  inferred_levels: Record<string, number>;
+}
+
 // ---------------------------------------------------------------------------
 // API calls
 // ---------------------------------------------------------------------------
@@ -158,5 +163,19 @@ export const api = {
       get<CourseRecommendationResult>(
         `/analysis/recommendations?user_id=${userId}&role_id=${roleId}&top_n=${topN}`
       ),
+  },
+  resume: {
+    parse: async (file: File): Promise<ParsedResumeProfile> => {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${BASE}/resume/parse`, { method: "POST", body: form });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Resume parse failed: ${res.status} ${text}`);
+      }
+      return res.json();
+    },
+    apply: (userId: number, body: { inferred_levels: Record<number, number>; name?: string; education?: string }) =>
+      post<{ applied: number; user_id: number }>(`/resume/apply/${userId}`, body),
   },
 };

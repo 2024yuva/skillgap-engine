@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database.init_db import init_db
-from app.api.routes import users, roles, competencies, analysis
+from app.api.routes import users, roles, competencies, analysis, resume
 
 app = FastAPI(
     title="SkillGap Engine API",
@@ -46,6 +46,7 @@ app.include_router(users.router,        prefix="/api/v1")
 app.include_router(roles.router,        prefix="/api/v1")
 app.include_router(competencies.router, prefix="/api/v1")
 app.include_router(analysis.router,     prefix="/api/v1")
+app.include_router(resume.router,       prefix="/api/v1")
 
 
 @app.get("/", tags=["health"])

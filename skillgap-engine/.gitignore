@@ -28,6 +28,9 @@ frontend/frontend/node_modules/
 frontend/frontend/.next/
 frontend/frontend/.turbo/
 
+# Raw data files (large, not tracked)
+data/raw/
+
 # OS
 .DS_Store
 Thumbs.db

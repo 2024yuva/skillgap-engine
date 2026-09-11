@@ -1,241 +1,234 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Navbar from "@/components/Navbar";
-import { api, type UserProfile, type Role } from "@/lib/api";
+import { Leaf, ArrowRight, Users } from "lucide-react";
+import { api } from "@/lib/api";
+import { setSession, getSession } from "@/lib/session";
 
-export default function ProfilePage() {
+const STEPS = [
+  "Upload Your Resume",
+  "AI Extracts Your Skills",
+  "Choose Your Target Role",
+  "View Competency Analysis",
+];
+
+export default function SignUpPage() {
   const router = useRouter();
-
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | "">("");
-  const [selectedRoleId, setSelectedRoleId] = useState<number | "">("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Form for creating a new user
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", education: "", department: "", experience: "" });
-  const [creating, setCreating] = useState(false);
+  const [tab, setTab] = useState<"signup" | "signin">("signup");
+  const [name, setName] = useState("");
+  const [education, setEducation] = useState("");
+  const [department, setDepartment] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [users, setUsers] = useState<{ id: number; name: string; education: string | null }[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.users.list(), api.roles.list()])
-      .then(([u, r]) => {
-        setUsers(u);
-        setRoles(r);
-        if (u.length > 0) setSelectedUserId(u[0].id);
-        if (r.length > 0) setSelectedRoleId(r[0].id);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+    const s = getSession();
+    if (s) router.replace("/profile");
+  }, [router]);
 
-  const selectedUser = users.find((u) => u.id === selectedUserId);
-  const selectedRole = roles.find((r) => r.id === selectedRoleId);
+  useEffect(() => {
+    if (tab === "signin") {
+      setLoadingUsers(true);
+      api.users.list().then(setUsers).catch(() => {}).finally(() => setLoadingUsers(false));
+    }
+  }, [tab]);
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
-    setCreating(true);
+    if (!name.trim()) { setError("Name is required."); return; }
+    setLoading(true); setError("");
     try {
       const user = await api.users.create({
-        name: form.name,
-        education: form.education || undefined,
-        department: form.department || undefined,
-        experience: form.experience ? Number(form.experience) : undefined,
+        name: name.trim(),
+        education: education.trim() || undefined,
+        department: department.trim() || undefined,
       });
-      setUsers((prev) => [...prev, user]);
-      setSelectedUserId(user.id);
-      setShowForm(false);
-      setForm({ name: "", education: "", department: "", experience: "" });
-    } catch (e: unknown) {
-      if (e instanceof Error) setError(e.message);
+      setSession({ id: user.id, name: user.name, education: user.education ?? undefined, department: user.department ?? undefined });
+      router.push("/profile");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
-      setCreating(false);
+      setLoading(false);
     }
   }
 
-  function goToDashboard() {
-    if (selectedUserId && selectedRoleId) {
-      router.push(`/dashboard?user=${selectedUserId}&role=${selectedRoleId}`);
-    }
+  function handleSignIn(user: { id: number; name: string; education: string | null }) {
+    setSession({ id: user.id, name: user.name, education: user.education ?? undefined });
+    router.push("/profile");
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navbar />
+    <div className="min-h-screen bg-[#0f1117] flex">
+      {/* Left panel */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-[#0f1117] to-[#0f1117]" />
+        <div className="absolute top-20 left-10 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-10 w-48 h-48 bg-violet-600/10 rounded-full blur-3xl" />
 
-      <main className="max-w-3xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-bold text-slate-800 mb-1">
-          Select Profile &amp; Target Role
-        </h1>
-        <p className="text-sm text-slate-500 mb-8">
-          Choose an existing profile or create a new one, then pick the role you want to
-          transition into.
-        </p>
-
-        {loading && (
-          <div className="flex items-center gap-2 text-slate-500 text-sm">
-            <span className="animate-spin">⟳</span> Loading data…
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-12">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500 flex items-center justify-center">
+              <Leaf size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-white">SkillGap Engine</p>
+              <p className="text-xs text-slate-400">From Your Skills to Your Next Opportunity</p>
+            </div>
           </div>
-        )}
 
-        {error && (
-          <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-4 mb-6">
-            <strong>Could not connect to backend:</strong> {error}
-            <p className="mt-1 text-xs text-red-500">
-              Make sure the FastAPI server is running on{" "}
-              <code>http://localhost:8000</code>
-            </p>
+          <h1 className="text-3xl font-bold text-white leading-tight mb-3">
+            AI-Powered Skill Gap<br />
+            Analysis &amp; Learning<br />
+            Recommendations
+          </h1>
+          <p className="text-slate-400 text-sm leading-relaxed mb-10">
+            Upload your resume, discover your competency gaps, and get a
+            personalised learning path to your dream role.
+          </p>
+
+          <div className="space-y-4">
+            {STEPS.map((step, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <div className="w-7 h-7 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-400 shrink-0">
+                  {i + 1}
+                </div>
+                <p className="text-sm text-slate-300 font-medium">{step}</p>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
 
-        {!loading && !error && (
-          <div className="space-y-6">
-            {/* User selector */}
-            <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
-                  Your Profile
-                </h2>
+        <div className="relative z-10">
+          <div className="flex gap-6 text-center">
+            {[["7", "Domains"], ["50+", "Competencies"], ["36", "Courses"]].map(([n, l]) => (
+              <div key={l}>
+                <p className="text-2xl font-bold text-indigo-400">{n}</p>
+                <p className="text-xs text-slate-500">{l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Right panel */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="flex items-center gap-2 mb-8 lg:hidden">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+              <Leaf size={15} className="text-white" />
+            </div>
+            <p className="text-base font-bold text-white">SkillGap Engine</p>
+          </div>
+
+          <div className="bg-[#1a1d2e] rounded-2xl p-8 border border-[#2d3152]">
+            {/* Tab switcher */}
+            <div className="flex bg-[#0f1117] rounded-xl p-1 mb-7">
+              {(["signup", "signin"] as const).map((t) => (
                 <button
-                  onClick={() => setShowForm(!showForm)}
-                  className="text-xs text-violet-600 hover:text-violet-800 font-medium"
+                  key={t}
+                  onClick={() => { setTab(t); setError(""); }}
+                  className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                    tab === t ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-white"
+                  }`}
                 >
-                  {showForm ? "Cancel" : "+ New profile"}
+                  {t === "signup" ? "Get Started" : "Sign In"}
                 </button>
-              </div>
+              ))}
+            </div>
 
-              {/* Existing user tiles */}
-              <div className="grid grid-cols-2 gap-3 mb-4 sm:grid-cols-3">
-                {users.map((u) => (
-                  <button
-                    key={u.id}
-                    onClick={() => setSelectedUserId(u.id)}
-                    className={`rounded-lg border p-3 text-left transition-all ${
-                      selectedUserId === u.id
-                        ? "border-violet-500 bg-violet-50 shadow-sm"
-                        : "border-slate-200 hover:border-slate-300 bg-white"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold text-slate-800 truncate">{u.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{u.education ?? "—"}</p>
-                    <p className="text-xs text-slate-400 truncate">{u.department ?? "—"}</p>
-                    {u.experience !== null && (
-                      <p className="text-xs text-slate-400">{u.experience}y exp</p>
-                    )}
-                  </button>
-                ))}
-              </div>
+            {tab === "signup" ? (
+              <>
+                <h2 className="text-xl font-bold text-white mb-1">Create your profile</h2>
+                <p className="text-xs text-slate-400 mb-6">No account needed. Just your name to begin.</p>
 
-              {/* New user form */}
-              {showForm && (
-                <form onSubmit={handleCreate} className="border-t border-slate-100 pt-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-slate-600 font-medium">Name *</label>
-                      <input
-                        required
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        className="mt-1 w-full rounded border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                        placeholder="e.g. Anita Sharma"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-600 font-medium">Education</label>
-                      <input
-                        value={form.education}
-                        onChange={(e) => setForm({ ...form, education: e.target.value })}
-                        className="mt-1 w-full rounded border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                        placeholder="e.g. B.Tech CSE"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-600 font-medium">Department</label>
-                      <input
-                        value={form.department}
-                        onChange={(e) => setForm({ ...form, department: e.target.value })}
-                        className="mt-1 w-full rounded border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                        placeholder="e.g. Mechanical Engineering"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-600 font-medium">Experience (years)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={form.experience}
-                        onChange={(e) => setForm({ ...form, experience: e.target.value })}
-                        className="mt-1 w-full rounded border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                        placeholder="0"
-                      />
-                    </div>
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 mb-1.5 block">Full Name *</label>
+                    <input
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="e.g. Ananya Sharma"
+                      className="w-full bg-[#0f1117] border border-[#2d3152] rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
+                    />
                   </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 mb-1.5 block">Education</label>
+                    <input
+                      value={education}
+                      onChange={e => setEducation(e.target.value)}
+                      placeholder="e.g. B.E. Electrical &amp; Electronics"
+                      className="w-full bg-[#0f1117] border border-[#2d3152] rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 mb-1.5 block">Department</label>
+                    <input
+                      value={department}
+                      onChange={e => setDepartment(e.target.value)}
+                      placeholder="e.g. Electrical Engineering"
+                      className="w-full bg-[#0f1117] border border-[#2d3152] rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
+                    />
+                  </div>
+
+                  {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-800/40 rounded-lg px-3 py-2">{error}</p>}
+
                   <button
                     type="submit"
-                    disabled={creating}
-                    className="text-sm bg-violet-600 hover:bg-violet-700 text-white rounded px-4 py-2 font-medium disabled:opacity-50"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-all"
                   >
-                    {creating ? "Creating…" : "Create Profile"}
+                    {loading ? "Creating..." : "Continue"}
+                    {!loading && <ArrowRight size={15} />}
                   </button>
                 </form>
-              )}
-            </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold text-white mb-1">Welcome back</h2>
+                <p className="text-xs text-slate-400 mb-6">Select your existing profile to continue.</p>
 
-            {/* Role selector */}
-            <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">
-                Target Role
-              </h2>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {roles.map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => setSelectedRoleId(r.id)}
-                    className={`rounded-lg border p-3 text-left transition-all ${
-                      selectedRoleId === r.id
-                        ? "border-violet-500 bg-violet-50 shadow-sm"
-                        : "border-slate-200 hover:border-slate-300 bg-white"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold text-slate-800">{r.name}</p>
-                    <p className="text-xs text-slate-500">{r.sector}</p>
-                    {r.description && (
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">{r.description}</p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Summary + CTA */}
-            {selectedUser && selectedRole && (
-              <div className="rounded-xl bg-violet-50 border border-violet-200 p-5 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-violet-800">
-                    {selectedUser.name}
-                  </p>
-                  <p className="text-xs text-violet-600">
-                    {selectedUser.education} • {selectedUser.department}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Targeting: <strong>{selectedRole.name}</strong>{" "}
-                    <span className="text-slate-400">({selectedRole.sector})</span>
-                  </p>
-                </div>
-                <button
-                  onClick={goToDashboard}
-                  className="ml-4 shrink-0 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
-                >
-                  Analyse Gaps →
-                </button>
-              </div>
+                {loadingUsers ? (
+                  <div className="text-center py-8 text-slate-500 text-sm">Loading profiles...</div>
+                ) : users.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users size={28} className="text-slate-600 mx-auto mb-2" />
+                    <p className="text-slate-400 text-sm">No profiles yet.</p>
+                    <button onClick={() => setTab("signup")} className="mt-2 text-indigo-400 text-sm hover:underline">Create one</button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto sidebar-scroll pr-1">
+                    {users.map(u => (
+                      <button
+                        key={u.id}
+                        onClick={() => handleSignIn(u)}
+                        className="w-full flex items-center gap-3 p-3 bg-[#0f1117] hover:bg-[#1e2130] border border-[#2d3152] hover:border-indigo-500/40 rounded-xl text-left transition-all group"
+                      >
+                        <div className="w-9 h-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-sm font-bold text-indigo-400 shrink-0">
+                          {u.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{u.name}</p>
+                          <p className="text-xs text-slate-500 truncate">{u.education ?? "No education set"}</p>
+                        </div>
+                        <ArrowRight size={14} className="text-slate-600 group-hover:text-indigo-400 transition-colors shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
-        )}
-      </main>
+
+          <p className="text-center text-xs text-slate-600 mt-5">
+            Your data is used only for skill gap analysis.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
