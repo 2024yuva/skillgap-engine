@@ -81,7 +81,7 @@ export default function ProfilePage() {
         setSession(currentSession);
       }
 
-      // Auto-apply skills to user session
+      // Auto-apply skills to user session in background so preview stays visible for user review
       const levels: Record<number, number> = {};
       for (const [k, v] of Object.entries(result.inferred_levels)) {
         levels[Number(k)] = v;
@@ -93,8 +93,7 @@ export default function ProfilePage() {
       });
 
       setApplied(true);
-      // Navigate directly to target role selection
-      router.push("/role");
+      // Keep user on profile page so they can review and inspect extracted skills
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Parsing failed.");
     } finally {
@@ -321,26 +320,14 @@ export default function ProfilePage() {
                 {/* Actions */}
                 <div className="flex gap-3 mt-5 pt-4 border-t border-slate-100">
                   <button
-                    onClick={handleApply}
-                    disabled={applying || applied}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                      applied
-                        ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                    }`}
-                  >
-                    {applying ? <Loader2 size={13} className="animate-spin" /> : applied ? <CheckCircle2 size={13} /> : <Edit3 size={13} />}
-                    {applied ? "Applied!" : applying ? "Applying..." : "Edit Skills"}
-                  </button>
-                  <button
                     onClick={() => {
                       if (!applied) handleApply().then(() => router.push("/role"));
                       else router.push("/role");
                     }}
-                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-sm font-semibold transition-all"
+                    className="btn-signup w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-sm font-semibold"
                   >
-                    Confirm &amp; Continue
-                    <ArrowRight size={13} />
+                    Confirm &amp; Proceed to Target Role Selection
+                    <ArrowRight size={14} />
                   </button>
                 </div>
               </div>

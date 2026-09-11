@@ -120,3 +120,95 @@ body {
 /* Drag-drop highlight */
 .drag-over { border-color: #6366f1 !important; background: #eef2ff !important; }
 
+/* ── Seamless Expanding Circle Button Animation ───────────────────────────── */
+
+/* Base ripple button utility */
+.btn-ripple {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: color 0.4s ease, border-color 0.4s ease, background-color 0.4s ease;
+}
+
+.btn-ripple::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background-color: var(--ripple-bg, #111111);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.btn-ripple:hover::before {
+  width: 300%;
+  height: 300%;
+}
+
+/* Primary indigo expanding button */
+.btn-signup,
+.btn-primary-ripple {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: color 0.4s ease, border-color 0.4s ease, background-color 0.4s ease;
+  --ripple-bg: #4338ca;
+}
+
+.btn-signup::before,
+.btn-primary-ripple::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background-color: var(--ripple-bg, #4338ca);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.btn-signup:hover::before,
+.btn-primary-ripple:hover::before {
+  width: 300%;
+  height: 300%;
+}
+
+/* Global button rule for all buttons across the application */
+button:not(.no-ripple):not(:disabled) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: color 0.4s ease, background-color 0.4s ease, border-color 0.4s ease, transform 0.2s ease;
+}
+
+button:not(.no-ripple):not(:disabled)::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background-color: currentColor;
+  opacity: 0.15;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+button:not(.no-ripple):not(:disabled):hover::before {
+  width: 300%;
+  height: 300%;
+}
+
+
