@@ -314,6 +314,8 @@ export const api = {
     },
     apply: (userId: number, body: { inferred_levels: Record<number, number>; name?: string; education?: string }) =>
       post<{ applied: number; user_id: number }>(`/resume/apply/${userId}`, body),
+    atsCheck: (text: string, extractedSkills: string[] = []) =>
+      post<AtsAnalysisResult>("/resume/ats-check", { text, extracted_skills: extractedSkills }),
   },
   assessment: {
     questions: (competencyId = 4) =>

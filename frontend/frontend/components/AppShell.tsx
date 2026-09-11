@@ -10,6 +10,7 @@ import {
   BookOpen,
   Map,
   ClipboardCheck,
+  FileSearch,
   LogOut,
   Leaf,
   Menu,
@@ -24,6 +25,7 @@ const NAV = [
   { label: "Courses",       href: "/courses",     icon: BookOpen },
   { label: "Learning Path", href: "/learning",    icon: Map },
   { label: "Assessment",    href: "/assessment",  icon: ClipboardCheck },
+  { label: "ATS Checker",   href: "/ats",         icon: FileSearch },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
