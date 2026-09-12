@@ -37,3 +37,18 @@ def get_role_competencies(role_id: int, db: Session = Depends(get_db)):
         .all()
     )
     return rows
+
+
+@router.get("/matches/{user_id}")
+def get_user_role_matches(user_id: int, db: Session = Depends(get_db)):
+    """Return all target roles ranked from most matched to least matched for a user."""
+    from app.services.gap_service import get_role_matches
+    return get_role_matches(user_id, db)
+
+
+@router.get("/company-matches/{user_id}")
+def get_user_company_job_matches(user_id: int, db: Session = Depends(get_db)):
+    """Return company job references (Google, Microsoft, NVIDIA, etc.) ranked by match score for a user."""
+    from app.services.gap_service import get_company_job_matches
+    return get_company_job_matches(user_id, db)
+

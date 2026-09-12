@@ -4,26 +4,26 @@ Database initialisation and seed loader.
 Run directly:
     python -m app.database.init_db
 
-Or call init_db() from the FastAPI startup event.
+Or called from the FastAPI startup event.
 """
 
 from __future__ import annotations
-import sys
 from sqlalchemy.orm import Session
 
 from app.database.connection import Base, engine, SessionLocal
 from app.models.models import (
     Competency, Role, RoleCompetency,
     User, UserCompetency, Course, CourseCompetency,
+    SkillCareerRecord, SkilloraResource, CompanyJobReference,
 )
 from app.ingestion.seed_data import (
     COMPETENCIES, ROLES, ROLE_COMPETENCIES,
     USERS, USER_COMPETENCIES, COURSES, COURSE_COMPETENCIES,
+    SKILL_CAREER_RECORDS, SKILLORA_RESOURCES, COMPANY_JOB_REFS,
 )
 
 
 def create_tables() -> None:
-    """Create all tables if they don't exist."""
     Base.metadata.create_all(bind=engine)
     print("[init_db] Tables created (or already exist).")
 
@@ -33,7 +33,6 @@ def _already_seeded(db: Session) -> bool:
 
 
 def seed(db: Session) -> None:
-    """Insert seed data if the database is empty."""
     if _already_seeded(db):
         print("[init_db] Database already seeded — skipping.")
         return
@@ -73,7 +72,29 @@ def seed(db: Session) -> None:
         db.add(CourseCompetency(**cc))
     db.commit()
 
+    # ── Skillora dataset tables ──────────────────────────────────────────
+    print("[init_db] Seeding Skill Career Dataset (105 records) …")
+    for rec in SKILL_CAREER_RECORDS:
+        db.add(SkillCareerRecord(**rec))
+    db.commit()
+
+    print("[init_db] Seeding Skillora Learning Resources …")
+    for res in SKILLORA_RESOURCES:
+        db.add(SkilloraResource(**res))
+    db.commit()
+
+    print("[init_db] Seeding Company Job References (35 records) …")
+    for ref in COMPANY_JOB_REFS:
+        db.add(CompanyJobReference(**ref))
+    db.commit()
+
     print("[init_db] Seed complete.")
+    print(f"[init_db]   Competencies:          {len(COMPETENCIES)}")
+    print(f"[init_db]   Roles:                 {len(ROLES)}")
+    print(f"[init_db]   Courses:               {len(COURSES)}")
+    print(f"[init_db]   Skill Career Records:  {len(SKILL_CAREER_RECORDS)}")
+    print(f"[init_db]   Skillora Resources:    {len(SKILLORA_RESOURCES)}")
+    print(f"[init_db]   Company Job Refs:      {len(COMPANY_JOB_REFS)}")
 
 
 def init_db() -> None:

@@ -10,20 +10,23 @@ import {
   BookOpen,
   Map,
   ClipboardCheck,
+  FileSearch,
   LogOut,
   Leaf,
   Menu,
   X,
 } from "lucide-react";
 import { getSession, clearSession, type SessionUser } from "@/lib/session";
+import SkilloraChat from "@/components/SkilloraChat";
 
 const NAV = [
   { label: "Profile",       href: "/profile",    icon: User },
-  { label: "Target Role",   href: "/role",        icon: Target },
-  { label: "Analysis",      href: "/analysis",    icon: BarChart2 },
-  { label: "Courses",       href: "/courses",     icon: BookOpen },
-  { label: "Learning Path", href: "/learning",    icon: Map },
-  { label: "Assessment",    href: "/assessment",  icon: ClipboardCheck },
+  { label: "Target Role",   href: "/role",       icon: Target },
+  { label: "Analysis",      href: "/analysis",   icon: BarChart2 },
+  { label: "Courses",       href: "/courses",    icon: BookOpen },
+  { label: "Learning Path", href: "/learning",   icon: Map },
+  { label: "Assessment",    href: "/assessment", icon: ClipboardCheck },
+  { label: "ATS Checker",   href: "/ats",        icon: FileSearch },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -109,7 +112,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-white truncate">{user?.name ?? "..."}</p>
-              <p className="text-[10px] text-slate-400 truncate">{user?.education ?? "Set up your profile"}</p>
+              <p className="text-[10px] text-slate-400 truncate">{user?.department ?? user?.education ?? "Set up your profile"}</p>
             </div>
           </div>
           <button
@@ -132,10 +135,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <span className="text-sm font-bold text-white">SkillGap Engine</span>
         </div>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto flex flex-col custom-scrollbar">
           {children}
         </main>
       </div>
+
+      {/* Skillora AI Assistant — floats over all pages */}
+      <SkilloraChat />
     </div>
   );
 }

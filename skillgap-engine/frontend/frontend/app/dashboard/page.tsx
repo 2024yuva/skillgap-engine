@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useMemo, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import CompetencyBar from "@/components/CompetencyBar";
 import CourseCard from "@/components/CourseCard";
 import ReadinessGauge from "@/components/ReadinessGauge";
 import CategoryRadar from "@/components/CategoryRadar";
+import { getSession } from "@/lib/session";
 import {
   api,
   type GapAnalysisResult,
@@ -37,11 +38,7 @@ export default function DashboardPage() {
 }
 
 function DashboardContent() {
-  const params = useSearchParams();
   const router = useRouter();
-
-  const userId = Number(params.get("user") ?? 1);
-  const roleId = Number(params.get("role") ?? 1);
 
   const [gapResult, setGapResult] = useState<GapAnalysisResult | null>(null);
   const [recResult, setRecResult] = useState<CourseRecommendationResult | null>(null);
@@ -52,11 +49,24 @@ function DashboardContent() {
   const [showAllGaps, setShowAllGaps] = useState(false);
 
   useEffect(() => {
+    const session = getSession();
+    if (!session) { 
+      router.replace("/"); 
+      return; 
+    }
+
+    const selectedRole = typeof window !== "undefined" ? 
+      JSON.parse(localStorage.getItem("selectedRole") ?? "null") : null;
+    if (!selectedRole) { 
+      router.replace("/role"); 
+      return; 
+    }
+
     setLoading(true);
     setError(null);
     Promise.all([
-      api.analysis.gaps(userId, roleId),
-      api.analysis.recommendations(userId, roleId),
+      api.analysis.gaps(session.id, selectedRole.id),
+      api.analysis.recommendations(session.id, selectedRole.id),
     ])
       .then(([g, r]) => {
         setGapResult(g);
@@ -64,7 +74,7 @@ function DashboardContent() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [userId, roleId]);
+  }, [router]);
 
   // Category filter options
   const categories = useMemo(() => {
@@ -156,8 +166,8 @@ function DashboardContent() {
           {/* Stats strip */}
           <div className="flex gap-3 flex-wrap">
             <StatPill label="Total Competencies" value={gapResult.gaps.length} color="slate" />
-            <StatPill label="Gaps Identified" value={gapResult.gap_count} color="red" />
-            <StatPill label="Already Met" value={gapResult.covered_count} color="emerald" />
+            <StatPill label="Strong Match" value={gapResult.strong_match_count ?? gapResult.covered_count} color="emerald" />
+            <StatPill label="Need Work" value={gapResult.gap_count} color="red" />
             <StatPill
               label="Top Gap"
               value={topGap?.competency_name ?? "None"}
@@ -183,32 +193,25 @@ function DashboardContent() {
               <CategoryRadar gaps={gapResult.gaps} />
             </div>
 
-            {/* Priority legend */}
+            {/* Priority legend — replaced with status guide */}
             <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                Priority Legend
+                Competency Status
               </p>
               <div className="space-y-1.5 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-sm bg-red-500" />
-                  <span className="text-slate-600">Critical (≥ 0.5)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-sm bg-orange-400" />
-                  <span className="text-slate-600">High (≥ 0.3)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-sm bg-yellow-400" />
-                  <span className="text-slate-600">Medium (≥ 0.1)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
-                  <span className="text-slate-600">Met / Low</span>
-                </div>
+                {[
+                  { color: "bg-emerald-500", label: "Strong Match" },
+                  { color: "bg-blue-500",    label: "Related / Transferable" },
+                  { color: "bg-yellow-400",  label: "Needs Verification" },
+                  { color: "bg-orange-400",  label: "Needs Development" },
+                  { color: "bg-slate-400",   label: "Missing Evidence" },
+                ].map(({ color, label }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-sm ${color}`} />
+                    <span className="text-slate-600">{label}</span>
+                  </div>
+                ))}
               </div>
-              <p className="text-xs text-slate-400 mt-3 leading-relaxed">
-                Priority = (gap / 5) × importance
-              </p>
             </div>
           </aside>
 
@@ -227,7 +230,7 @@ function DashboardContent() {
                   }`}
                 >
                   {t === "gaps"
-                    ? `Competency Gaps (${gapResult.gap_count})`
+                    ? `Competency Profile (${gapResult.gaps.length})`
                     : t === "courses"
                     ? `Course Recommendations (${recResult?.recommendations.length ?? 0})`
                     : "Category Overview"}

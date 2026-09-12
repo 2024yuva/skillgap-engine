@@ -79,6 +79,14 @@ export interface CompetencyGap {
   importance: number;
   priority_score: number;
   evidence_source: string | null;
+  // User-facing classification fields
+  status: "strong_match" | "related" | "needs_verification" | "needs_development" | "missing";
+  status_label: string;
+  status_reason: string;
+  related_skill_name: string | null;
+  confidence: number;
+  action_label: string;
+  evidence_bullets: string[];
 }
 
 export interface GapAnalysisResult {
@@ -90,6 +98,11 @@ export interface GapAnalysisResult {
   covered_count: number;
   gap_count: number;
   readiness_score: number;
+  strong_match_count: number;
+  related_count: number;
+  needs_verification_count: number;
+  needs_development_count: number;
+  missing_count: number;
 }
 
 export interface Course {
@@ -125,6 +138,70 @@ export interface UserCompetency {
   competency: Competency;
 }
 
+export interface AiDetection {
+  ai_probability_score: number;
+  human_score: number;
+  verdict: string;
+  verdict_summary: string;
+  flagged_ai_patterns: string[];
+  human_markers: string[];
+}
+
+export interface AtsScoring {
+  overall_score: number;
+  grade: string;
+  formatting_score: number;
+  impact_score: number;
+  metrics_score: number;
+  completeness_score: number;
+  readability_score: number;
+  keyword_score: number;
+}
+
+export interface SectionHealthItem {
+  section: string;
+  status: "good" | "warning" | "missing";
+  feedback: string;
+}
+
+export interface AtsDiagnostics {
+  key_strengths: string[];
+  critical_issues: string[];
+  quantifiable_metrics_count: number;
+  quantifiable_metrics_examples: string[];
+  action_verbs_strong: string[];
+  action_verbs_weak: string[];
+  section_health: SectionHealthItem[];
+}
+
+export interface BulletPointImprovement {
+  original: string;
+  improved: string;
+  explanation: string;
+  formula_applied: string;
+}
+
+export interface FormattingChecklistItem {
+  item: string;
+  passed: boolean;
+  tip: string;
+}
+
+export interface ResumeBuilderGuide {
+  top_actionable_recommendations: string[];
+  bullet_point_improvements: BulletPointImprovement[];
+  missing_critical_keywords: string[];
+  recommended_sections_to_add: string[];
+  formatting_checklist: FormattingChecklistItem[];
+}
+
+export interface AtsAnalysisResult {
+  ai_detection: AiDetection;
+  ats_scoring: AtsScoring;
+  diagnostics: AtsDiagnostics;
+  resume_builder_guide: ResumeBuilderGuide;
+}
+
 export interface ParsedResumeProfile {
   name: string | null;
   education: string;
@@ -135,6 +212,64 @@ export interface ParsedResumeProfile {
   courses_certifications: string[];
   matched_competency_ids: number[];
   inferred_levels: Record<string, number>;
+  ats_analysis?: AtsAnalysisResult;
+}
+
+
+export interface AssessmentQuestion {
+  id: number;
+  topic: string;
+  question_text: string;
+  question_type: "mcq" | "trace" | "complexity";
+  options: string[] | null;
+  correct_answer: string;
+  explanation: string;
+  difficulty: "easy" | "medium" | "hard";
+}
+
+export interface TopicResult {
+  topic: string;
+  score: number;
+  label: string;
+  questions_attempted: number;
+  questions_correct: number;
+}
+
+export interface AssessmentResult {
+  user_id: number;
+  competency_id: number;
+  competency_name: string;
+  overall_score: number;
+  verified_level: number;
+  topic_results: TopicResult[];
+  summary: string;
+  strongest_topics: string[];
+  development_areas: string[];
+}
+
+export interface RoleMatch {
+  id: number;
+  name: string;
+  sector: string;
+  description: string | null;
+  match_score: number;
+  matched_count: number;
+  total_required: number;
+  matched_skills: string[];
+  missing_skills: string[];
+}
+
+export interface CompanyJobMatch {
+  company_name: string;
+  about_role: string;
+  category: string;
+  required_skills: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  match_score: number;
+  working_duration: string;
+  application_link: string;
+  salary_lpa: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +287,8 @@ export const api = {
   roles: {
     list: () => get<Role[]>("/roles/"),
     get: (id: number) => get<Role>(`/roles/${id}`),
+    matches: (userId: number) => get<RoleMatch[]>(`/roles/matches/${userId}`),
+    companyMatches: (userId: number) => get<CompanyJobMatch[]>(`/roles/company-matches/${userId}`),
   },
   competencies: {
     list: () => get<Competency[]>("/competencies/"),
@@ -177,5 +314,22 @@ export const api = {
     },
     apply: (userId: number, body: { inferred_levels: Record<number, number>; name?: string; education?: string }) =>
       post<{ applied: number; user_id: number }>(`/resume/apply/${userId}`, body),
+    atsCheck: (text: string, extractedSkills: string[] = []) =>
+      post<AtsAnalysisResult>("/resume/ats-check", { text, extracted_skills: extractedSkills }),
+  },
+  assessment: {
+    questions: (competencyId = 4) =>
+      get<AssessmentQuestion[]>(`/assessment/questions?competency_id=${competencyId}`),
+    submit: (body: { user_id: number; competency_id: number; answers: Record<number, string> }) =>
+      post<AssessmentResult>("/assessment/submit", body),
+  },
+  skillora: {
+    chat: (body: {
+      user_id?: number;
+      message: string;
+      history: { role: "user" | "assistant"; content: string }[];
+      page_context?: string;
+    }) => post<{ reply: string }>("/skillora/chat", body),
   },
 };
+

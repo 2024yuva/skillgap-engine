@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import { api, type ParsedResumeProfile } from "@/lib/api";
+import AtsResultsPanel from "@/components/AtsResultsPanel";
+import { api, type ParsedResumeProfile, type Competency } from "@/lib/api";
 import { getSession, setSession, getSelectedRole } from "@/lib/session";
 import {
   Upload, FileText, CheckCircle2, AlertCircle, Edit3,
@@ -33,8 +34,21 @@ export default function ProfilePage() {
   const [editedSoftSkills, setEditedSoftSkills] = useState<string[]>([]);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [competencyNames, setCompetencyNames] = useState<Record<number, string>>({});
+  const [resultTab, setResultTab] = useState<"skills" | "ats">("skills");
 
   const selectedRole = typeof window !== "undefined" ? getSelectedRole() : null;
+
+  // Fetch competency names for the inferred levels preview
+  useEffect(() => {
+    api.competencies.list()
+      .then(comps => {
+        const map: Record<number, string> = {};
+        comps.forEach(c => { map[c.id] = c.name; });
+        setCompetencyNames(map);
+      })
+      .catch(() => { });
+  }, []);
 
   function onDragOver(e: React.DragEvent) { e.preventDefault(); setDragging(true); }
   function onDragLeave() { setDragging(false); }
@@ -44,7 +58,7 @@ export default function ProfilePage() {
     if (f) pickFile(f);
   }
   function pickFile(f: File) {
-    setFile(f); setParsed(null); setParseError(""); setApplied(false);
+    setFile(f); setParsed(null); setParseError(""); setApplied(false); setResultTab("skills");
   }
 
   async function handleParse() {
@@ -53,12 +67,44 @@ export default function ProfilePage() {
     try {
       const result = await api.resume.parse(file);
       setParsed(result);
+      if (result.ats_analysis) setResultTab("ats");
       setEditedSkills(result.technical_skills);
       setEditedSoftSkills(result.soft_skills);
-      // Update session name if detected
-      if (result.name && session) {
-        setSession({ ...session, name: result.name, education: result.education || session.education });
+
+      let currentSession = session;
+      if (currentSession) {
+        try {
+          await api.users.get(currentSession.id);
+        } catch (e) {
+          if (!(e instanceof Error) || !e.message.includes("404")) throw e;
+          currentSession = null;
+        }
       }
+      if (!currentSession) {
+        const newUser = await api.users.create({
+          name: result.name || file.name.split(".")[0],
+          education: result.education || undefined,
+        });
+        currentSession = { id: newUser.id, name: newUser.name, education: newUser.education ?? undefined };
+        setSession(currentSession);
+      } else if (result.name) {
+        currentSession = { ...currentSession, name: result.name, education: result.education || currentSession.education };
+        setSession(currentSession);
+      }
+
+      // Auto-apply skills to user session in background so preview stays visible for user review
+      const levels: Record<number, number> = {};
+      for (const [k, v] of Object.entries(result.inferred_levels)) {
+        levels[Number(k)] = v;
+      }
+      await api.resume.apply(currentSession.id, {
+        inferred_levels: levels,
+        name: result.name ?? undefined,
+        education: result.education || undefined,
+      });
+
+      setApplied(true);
+      // Keep user on profile page so they can review and inspect extracted skills
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Parsing failed.");
     } finally {
@@ -67,25 +113,28 @@ export default function ProfilePage() {
   }
 
   async function handleApply() {
-    if (!parsed || !session) return;
+    const currentSession = getSession();
+    if (!parsed || !currentSession) return;
     setApplying(true);
     try {
       const levels: Record<number, number> = {};
       for (const [k, v] of Object.entries(parsed.inferred_levels)) {
         levels[Number(k)] = v;
       }
-      await api.resume.apply(session.id, {
+      await api.resume.apply(currentSession.id, {
         inferred_levels: levels,
         name: parsed.name ?? undefined,
         education: parsed.education || undefined,
       });
       setApplied(true);
+      router.push("/role");
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Failed to apply.");
     } finally {
       setApplying(false);
     }
   }
+
 
   function addManualSkill() {
     const s = skillInput.trim();
@@ -110,9 +159,8 @@ export default function ProfilePage() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                tab === t ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${tab === t ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               {t === "upload" ? "Upload Resume" : "Manual Input"}
             </button>
@@ -186,115 +234,148 @@ export default function ProfilePage() {
             {/* Parsed results */}
             {parsed ? (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-slate-700">Extracted Skills Preview</h2>
-                  <span className="text-xs text-slate-400 bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
-                    {parsed.matched_competency_ids.length} competencies matched
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-400 mb-4">
-                  We found the following from your resume. You can add or remove items.
-                </p>
-
-                <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-                  {/* Name + Education */}
-                  {(parsed.name || parsed.education) && (
-                    <section>
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Profile</h3>
-                      {parsed.name && <p className="text-sm text-slate-700 font-medium">{parsed.name}</p>}
-                      {parsed.education && <p className="text-xs text-slate-500">{parsed.education}</p>}
-                    </section>
-                  )}
-
-                  {/* Technical Skills */}
-                  <SkillChipGroup
-                    label="Technical Skills"
-                    color="indigo"
-                    items={editedSkills}
-                    onRemove={(s) => setEditedSkills(p => p.filter(x => x !== s))}
-                  />
-
-                  {/* Soft Skills */}
-                  {editedSoftSkills.length > 0 && (
-                    <SkillChipGroup
-                      label="Soft Skills"
-                      color="violet"
-                      items={editedSoftSkills}
-                      onRemove={(s) => setEditedSoftSkills(p => p.filter(x => x !== s))}
-                    />
-                  )}
-
-                  {/* Education */}
-                  {parsed.education && (
-                    <section>
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Education</h3>
-                      <p className="text-xs text-slate-600">{parsed.education}</p>
-                    </section>
-                  )}
-
-                  {/* Experience */}
-                  {parsed.experience_summary && (
-                    <section>
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Experience</h3>
-                      <p className="text-xs text-slate-600">{parsed.experience_summary}</p>
-                    </section>
-                  )}
-
-                  {/* Courses */}
-                  {parsed.courses_certifications.length > 0 && (
-                    <section>
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Courses / Certifications</h3>
-                      <ul className="space-y-1">
-                        {parsed.courses_certifications.map((c, i) => (
-                          <li key={i} className="text-xs text-slate-600 flex items-start gap-1.5">
-                            <span className="text-indigo-400 mt-0.5">•</span>{c}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  )}
-
-                  {/* Inferred levels preview */}
-                  <section>
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Inferred Competency Levels</h3>
-                    <div className="space-y-1">
-                      {Object.entries(parsed.inferred_levels).slice(0, 5).map(([id, level]) => (
-                        <div key={id} className="flex items-center justify-between">
-                          <span className="text-xs text-slate-600">Competency #{id}</span>
-                          <span className="text-xs font-medium text-indigo-600">{LEVEL_LABELS[level]}</span>
-                        </div>
-                      ))}
-                      {Object.keys(parsed.inferred_levels).length > 5 && (
-                        <p className="text-xs text-slate-400">+{Object.keys(parsed.inferred_levels).length - 5} more</p>
+                {/* Card tab switcher */}
+                <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit mb-4">
+                  {(["skills", "ats"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setResultTab(t)}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        resultTab === t
+                          ? "bg-white text-indigo-600 shadow-sm"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      {t === "skills" ? "Skills Preview" : "ATS Report"}
+                      {t === "ats" && parsed.ats_analysis && (
+                        <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-bold">
+                          ✓
+                        </span>
                       )}
-                    </div>
-                  </section>
+                    </button>
+                  ))}
                 </div>
+
+                {resultTab === "skills" ? (
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-sm font-semibold text-slate-700">Extracted Skills Preview</h2>
+                      <span className="text-xs text-slate-400 bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                        {parsed.matched_competency_ids.length} competencies matched
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-400 mb-4">
+                      We found the following from your resume. You can add or remove items.
+                    </p>
+
+                    <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-1">
+                      {/* Name + Education */}
+                      {(parsed.name || parsed.education) && (
+                        <section>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Profile</h3>
+                          {parsed.name && <p className="text-sm text-slate-700 font-medium">{parsed.name}</p>}
+                          {parsed.education && <p className="text-xs text-slate-500">{parsed.education}</p>}
+                        </section>
+                      )}
+
+                      {/* Technical Skills */}
+                      <SkillChipGroup
+                        label="Technical Skills"
+                        color="indigo"
+                        items={editedSkills}
+                        onRemove={(s) => setEditedSkills(p => p.filter(x => x !== s))}
+                      />
+
+                      {/* Soft Skills */}
+                      {editedSoftSkills.length > 0 && (
+                        <SkillChipGroup
+                          label="Soft Skills"
+                          color="violet"
+                          items={editedSoftSkills}
+                          onRemove={(s) => setEditedSoftSkills(p => p.filter(x => x !== s))}
+                        />
+                      )}
+
+                      {/* Education */}
+                      {parsed.education && (
+                        <section>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Education</h3>
+                          <p className="text-xs text-slate-600">{parsed.education}</p>
+                        </section>
+                      )}
+
+                      {/* Experience */}
+                      {parsed.experience_summary && (
+                        <section>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Experience</h3>
+                          <p className="text-xs text-slate-600">{parsed.experience_summary}</p>
+                        </section>
+                      )}
+
+                      {/* Courses */}
+                      {parsed.courses_certifications.length > 0 && (
+                        <section>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Courses / Certifications</h3>
+                          <ul className="space-y-1">
+                            {parsed.courses_certifications.map((c, i) => (
+                              <li key={i} className="text-xs text-slate-600 flex items-start gap-1.5">
+                                <span className="text-indigo-400 mt-0.5">•</span>{c}
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      )}
+
+                      {/* Inferred levels preview */}
+                      <section>
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Inferred Competency Levels</h3>
+                        <div className="space-y-1.5">
+                          {Object.entries(parsed.inferred_levels).slice(0, 6).map(([id, level]) => {
+                            const name = competencyNames[Number(id)] ?? `Competency #${id}`;
+                            return (
+                              <div key={id} className="flex items-center justify-between gap-2">
+                                <span className="text-xs text-slate-600 truncate">{name}</span>
+                                <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full shrink-0">
+                                  {LEVEL_LABELS[level]}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {Object.keys(parsed.inferred_levels).length > 6 && (
+                            <p className="text-xs text-slate-400">+{Object.keys(parsed.inferred_levels).length - 6} more competencies detected</p>
+                          )}
+                          {Object.keys(parsed.inferred_levels).length === 0 && (
+                            <p className="text-xs text-slate-400">No competencies matched from this resume.</p>
+                          )}
+                        </div>
+                      </section>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
+                    {parsed.ats_analysis ? (
+                      <AtsResultsPanel data={parsed.ats_analysis} />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
+                        <p className="text-sm font-semibold text-slate-400">ATS analysis unavailable</p>
+                        <p className="text-xs text-slate-300">The server did not return ATS data for this resume.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3 mt-5 pt-4 border-t border-slate-100">
-                  <button
-                    onClick={handleApply}
-                    disabled={applying || applied}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                      applied
-                        ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                    }`}
-                  >
-                    {applying ? <Loader2 size={13} className="animate-spin" /> : applied ? <CheckCircle2 size={13} /> : <Edit3 size={13} />}
-                    {applied ? "Applied!" : applying ? "Applying..." : "Edit Skills"}
-                  </button>
                   <button
                     onClick={() => {
                       if (!applied) handleApply().then(() => router.push("/role"));
                       else router.push("/role");
                     }}
-                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-sm font-semibold transition-all"
+                    className="btn-signup w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-sm font-semibold"
                   >
-                    Confirm &amp; Continue
-                    <ArrowRight size={13} />
+                    Confirm &amp; Proceed to Target Role Selection
+                    <ArrowRight size={14} />
                   </button>
                 </div>
               </div>
