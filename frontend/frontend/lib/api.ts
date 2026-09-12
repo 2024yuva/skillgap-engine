@@ -323,5 +323,13 @@ export const api = {
     submit: (body: { user_id: number; competency_id: number; answers: Record<number, string> }) =>
       post<AssessmentResult>("/assessment/submit", body),
   },
+  skillora: {
+    chat: (body: {
+      user_id?: number;
+      message: string;
+      history: { role: "user" | "assistant"; content: string }[];
+      page_context?: string;
+    }) => post<{ reply: string }>("/skillora/chat", body),
+  },
 };
 

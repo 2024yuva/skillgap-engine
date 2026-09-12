@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { getSession, clearSession, type SessionUser } from "@/lib/session";
+import SkilloraChat from "@/components/SkilloraChat";
 
 const NAV = [
   { label: "Profile",       href: "/profile",    icon: User },
@@ -138,6 +139,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {/* Skillora AI Assistant — floats over all pages */}
+      <SkilloraChat />
     </div>
   );
 }
