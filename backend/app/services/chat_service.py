@@ -33,10 +33,8 @@ LEVEL_LABELS = ["No Evidence", "Awareness", "Basic", "Intermediate", "Advanced",
 
 def _call_groq(messages: List[Dict[str, str]], model: str = PRIMARY_MODEL) -> str:
     if not GROQ_API_KEY:
-        return (
-            "Hey! I need a GROQ_API_KEY to chat with you. "
-            "Make sure it's set in your backend .env file 🔧"
-        )
+        # Instead of just error, this will trigger the offline response
+        raise Exception("No API key configured")
 
     payload = {
         "model": model,
@@ -62,33 +60,23 @@ def _call_groq(messages: List[Dict[str, str]], model: str = PRIMARY_MODEL) -> st
             return data["choices"][0]["message"]["content"].strip()
             
     except urllib.error.HTTPError as e:
-        error_body = ""
-        try:
-            error_body = e.read().decode()
-        except:
-            pass
-            
         if e.code == 401:
-            return "🔑 Looks like there's an API key issue. Let me check that for you..."
+            raise Exception(f"API authentication failed: {e.code}")
         elif e.code == 429:
             if model != FALLBACK_MODEL:
                 return _call_groq(messages, model=FALLBACK_MODEL)
-            return "⏰ I'm getting too many requests right now. Try again in a moment!"
+            raise Exception(f"Rate limit exceeded: {e.code}")
         elif e.code >= 500:
             if model != FALLBACK_MODEL:
                 return _call_groq(messages, model=FALLBACK_MODEL)
-            return "🛠️ The AI service is having issues. Let me try the backup model..."
+            raise Exception(f"API server error: {e.code}")
         else:
-            return f"🤔 Got an unexpected error (HTTP {e.code}). The API might be having issues."
+            raise Exception(f"API error: {e.code}")
             
     except Exception as e:
         if model != FALLBACK_MODEL:
             return _call_groq(messages, model=FALLBACK_MODEL)
-        return (
-            "😅 Something went wrong connecting to the AI service. "
-            "The backend might be offline or there could be a network issue. "
-            f"Error details: {str(e)[:100]}"
-        )
+        raise Exception(f"Connection error: {str(e)}")
 
 
 
@@ -284,23 +272,115 @@ def get_chat_response(
     :param db:           SQLAlchemy session
     :returns:            AI reply string (markdown)
     """
-    # Collect live context
-    ctx = _build_user_context(user_id, db) if user_id else {}
+    
+    # Try AI first, but fall back to intelligent responses if API fails
+    try:
+        # Collect live context
+        ctx = _build_user_context(user_id, db) if user_id else {}
+        
+        system_prompt = _context_to_system_prompt(ctx)
+        if page_context:
+            system_prompt += f"\n\nThe user is currently on the '{page_context}' page."
 
-    system_prompt = _context_to_system_prompt(ctx)
-    if page_context:
-        system_prompt += f"\n\nThe user is currently on the '{page_context}' page."
+        # Build message list for Groq
+        messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
 
-    # Build message list for Groq
-    messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
+        # Include last 6 turns of history to keep context window manageable
+        for turn in history[-6:]:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
 
-    # Include last 6 turns of history to keep context window manageable
-    for turn in history[-6:]:
-        role = turn.get("role", "user")
-        content = turn.get("content", "")
-        if role in ("user", "assistant") and content:
-            messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": message})
 
-    messages.append({"role": "user", "content": message})
+        return _call_groq(messages)
+        
+    except Exception:
+        # If API completely fails, provide intelligent offline responses
+        return _get_offline_response(message, user_id, db, page_context)
 
-    return _call_groq(messages)
+
+def _get_offline_response(message: str, user_id: Optional[int], db: Session, page_context: str) -> str:
+    """Provide helpful responses when AI API is unavailable."""
+    msg_lower = message.lower()
+    
+    # Analyze user's actual data if available
+    if user_id:
+        try:
+            ctx = _build_user_context(user_id, db)
+            user_name = ctx.get("user", {}).get("name", "there")
+            skills = ctx.get("skills", [])
+            top_roles = ctx.get("top_role_matches", [])
+            salary_data = ctx.get("salary_insights", [])
+        except:
+            user_name = "there"
+            skills = []
+            top_roles = []
+            salary_data = []
+    else:
+        user_name = "there"
+        skills = []
+        top_roles = []
+        salary_data = []
+
+    # Career guidance responses based on message content
+    if any(word in msg_lower for word in ["resume", "cv", "improve"]):
+        if skills:
+            return f"Hey {user_name}! 📄 Based on your profile, here are some **resume tips**:\n\n• **Highlight your strongest skills**: {', '.join([s.split(':')[0].strip('- ') for s in skills[:3]])}\n• **Use action verbs** like 'Developed', 'Built', 'Optimized'\n• **Add metrics** - quantify your achievements with numbers\n• **Tailor keywords** to match job descriptions\n\n*Want a detailed ATS analysis? Try uploading your resume to the ATS Checker!*"
+        else:
+            return f"Hey {user_name}! 📄 **Great resume tips**:\n\n• **Start with a strong summary** highlighting your key skills\n• **Use action verbs** like 'Developed', 'Built', 'Led', 'Optimized'\n• **Quantify achievements** with numbers and percentages\n• **Include relevant keywords** for ATS systems\n• **Keep it concise** - 1-2 pages max\n\n*Upload your resume to get personalized feedback!*"
+    
+    elif any(word in msg_lower for word in ["skills", "analyze", "gap", "strength", "weakness"]):
+        if skills:
+            skill_names = [s.split(':')[0].strip('- ') for s in skills[:5]]
+            return f"Hey {user_name}! 🧠 **Your current skills analysis**:\n\n**Top Skills**: {', '.join(skill_names)}\n\n**Recommendations**:\n• **Keep building** on your strongest areas\n• **Add complementary skills** to increase job market value\n• **Take assessments** to verify your skill levels\n• **Work on projects** to demonstrate practical application\n\n*Visit the Assessment page to validate your skills!*"
+        else:
+            return f"Hey {user_name}! 🧠 **Let's build your skills profile**:\n\n• **Upload your resume** to automatically detect skills\n• **Take skill assessments** to validate your knowledge\n• **Add skills manually** from your experience\n• **Complete projects** to demonstrate competency\n\n*Start by visiting the Profile page to set up your skills!*"
+    
+    elif any(word in msg_lower for word in ["job", "role", "career", "suitable", "match"]):
+        if top_roles:
+            role_info = "\n".join([f"• **{r['role']}** - {r['match_score']}% match" for r in top_roles[:3]])
+            return f"Hey {user_name}! 💼 **Your best job matches**:\n\n{role_info}\n\n**Next steps**:\n• **Analyze skill gaps** for your target role\n• **Identify missing skills** to focus your learning\n• **Build relevant projects** to strengthen your profile\n• **Network in your industry** for opportunities\n\n*Check the Analysis page for detailed gap analysis!*"
+        else:
+            return f"Hey {user_name}! 💼 **Finding the right career path**:\n\n• **Set up your profile** with skills and experience\n• **Explore different roles** in the Target Role section\n• **Take assessments** to discover your strengths\n• **Research industry trends** and growth areas\n\n*Complete your profile first to get personalized job matches!*"
+    
+    elif any(word in msg_lower for word in ["salary", "pay", "money", "earn", "income"]):
+        if salary_data:
+            salary_info = "\n".join([f"• **{s['skill']}** → {s['role']}: {s['salary']}" for s in salary_data[:3]])
+            return f"Hey {user_name}! 💰 **Salary insights for your skills**:\n\n{salary_info}\n\n**Factors affecting salary**:\n• **Experience level** (entry/mid/senior)\n• **Location** (metro cities pay more)\n• **Company size** (startups vs enterprises)\n• **Skill demand** in the market\n\n*Your actual salary may vary based on negotiation and performance!*"
+        else:
+            return f"Hey {user_name}! 💰 **General salary guidance**:\n\n• **Entry level**: ₹3-6 LPA for most tech roles\n• **Mid level** (3-5 years): ₹6-12 LPA\n• **Senior level** (5+ years): ₹12-25 LPA\n• **Specialist roles**: Can go much higher\n\n*Set up your skills profile to get personalized salary insights!*"
+    
+    elif any(word in msg_lower for word in ["learn", "course", "study", "path", "roadmap"]):
+        if top_roles:
+            target_role = top_roles[0]['role']
+            missing = top_roles[0].get('missing_skills', [])[:3]
+            if missing:
+                return f"Hey {user_name}! 📚 **Learning path for {target_role}**:\n\n**Priority skills to learn**:\n" + \
+                       "\n".join([f"• **{skill}** - High demand skill" for skill in missing]) + \
+                       "\n\n**Learning approach**:\n• **Take online courses** (Coursera, Udemy)\n• **Build hands-on projects** \n• **Join communities** and forums\n• **Find mentors** in your field\n\n*Visit the Courses page for specific recommendations!*"
+        
+        return f"Hey {user_name}! 📚 **Creating your learning path**:\n\n**Steps to success**:\n• **Identify your goal** (target role/skill)\n• **Assess current level** through testing\n• **Find quality resources** (courses, books, projects)\n• **Practice consistently** with real projects\n• **Get feedback** from peers and mentors\n\n*Complete your profile to get a personalized learning roadmap!*"
+    
+    elif any(word in msg_lower for word in ["help", "what", "how", "can", "do"]):
+        features = []
+        if page_context == "profile":
+            features = ["upload your resume", "add skills manually", "view extracted data"]
+        elif page_context == "role":
+            features = ["explore job roles", "see match percentages", "find suitable careers"]
+        elif page_context == "analysis":
+            features = ["analyze skill gaps", "get readiness scores", "see missing competencies"]
+        elif page_context == "courses":
+            features = ["find learning resources", "get course recommendations", "plan your learning"]
+        elif page_context == "ats":
+            features = ["check ATS compatibility", "get resume feedback", "improve formatting"]
+        else:
+            features = ["career guidance", "skill analysis", "job matching", "salary insights", "learning paths"]
+            
+        return f"Hey {user_name}! 👋 **I'm here to help you with**:\n\n" + \
+               "\n".join([f"• **{feature.title()}**" for feature in features]) + \
+               "\n\n**What would you like to focus on?** Just ask me about:\n• Resume improvement\n• Skill gap analysis\n• Job recommendations\n• Learning paths\n• Salary insights"
+    
+    # Default friendly response
+    return f"Hey {user_name}! 😊 I understand you're asking about **{message[:50]}{'...' if len(message) > 50 else ''}**\n\n**I can help you with**:\n• 📄 **Resume improvement** and ATS optimization\n• 🧠 **Skill analysis** and gap identification\n• 💼 **Job matching** based on your profile\n• 💰 **Salary insights** for your skills\n• 📚 **Learning paths** and course recommendations\n\n*What specific area would you like to explore?*"
