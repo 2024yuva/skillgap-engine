@@ -21,12 +21,12 @@ import SkilloraChat from "@/components/SkilloraChat";
 
 const NAV = [
   { label: "Profile",       href: "/profile",    icon: User },
-  { label: "Target Role",   href: "/role",        icon: Target },
-  { label: "Analysis",      href: "/analysis",    icon: BarChart2 },
-  { label: "Courses",       href: "/courses",     icon: BookOpen },
-  { label: "Learning Path", href: "/learning",    icon: Map },
-  { label: "Assessment",    href: "/assessment",  icon: ClipboardCheck },
-  { label: "ATS Checker",   href: "/ats",         icon: FileSearch },
+  { label: "Target Role",   href: "/role",       icon: Target },
+  { label: "Analysis",      href: "/analysis",   icon: BarChart2 },
+  { label: "Courses",       href: "/courses",    icon: BookOpen },
+  { label: "Learning Path", href: "/learning",   icon: Map },
+  { label: "Assessment",    href: "/assessment", icon: ClipboardCheck },
+  { label: "ATS Checker",   href: "/ats",        icon: FileSearch },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

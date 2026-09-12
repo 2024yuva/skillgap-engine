@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useMemo, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import CompetencyBar from "@/components/CompetencyBar";
 import CourseCard from "@/components/CourseCard";
 import ReadinessGauge from "@/components/ReadinessGauge";
 import CategoryRadar from "@/components/CategoryRadar";
+import { getSession } from "@/lib/session";
 import {
   api,
   type GapAnalysisResult,
@@ -37,11 +38,7 @@ export default function DashboardPage() {
 }
 
 function DashboardContent() {
-  const params = useSearchParams();
   const router = useRouter();
-
-  const userId = Number(params.get("user") ?? 1);
-  const roleId = Number(params.get("role") ?? 1);
 
   const [gapResult, setGapResult] = useState<GapAnalysisResult | null>(null);
   const [recResult, setRecResult] = useState<CourseRecommendationResult | null>(null);
@@ -52,11 +49,24 @@ function DashboardContent() {
   const [showAllGaps, setShowAllGaps] = useState(false);
 
   useEffect(() => {
+    const session = getSession();
+    if (!session) { 
+      router.replace("/"); 
+      return; 
+    }
+
+    const selectedRole = typeof window !== "undefined" ? 
+      JSON.parse(localStorage.getItem("selectedRole") ?? "null") : null;
+    if (!selectedRole) { 
+      router.replace("/role"); 
+      return; 
+    }
+
     setLoading(true);
     setError(null);
     Promise.all([
-      api.analysis.gaps(userId, roleId),
-      api.analysis.recommendations(userId, roleId),
+      api.analysis.gaps(session.id, selectedRole.id),
+      api.analysis.recommendations(session.id, selectedRole.id),
     ])
       .then(([g, r]) => {
         setGapResult(g);
@@ -64,7 +74,7 @@ function DashboardContent() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [userId, roleId]);
+  }, [router]);
 
   // Category filter options
   const categories = useMemo(() => {
