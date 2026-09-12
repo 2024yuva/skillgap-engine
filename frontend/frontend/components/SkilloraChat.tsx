@@ -49,7 +49,7 @@ const WELCOME: ChatMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hi! I'm Skillora AI 👋\n\nI can help you **improve your resume**, identify **skill gaps**, discover **suitable job roles**, explore **salary insights**, and build your **personalized learning path**.\n\nWhat would you like to know?",
+    "Hey there! 👋 I'm Skillora AI, your friendly career buddy!\n\nI'm here to help you **level up your career** — whether that's improving your resume, finding the perfect job match, understanding your skill gaps, or planning your next learning adventure.\n\n**What's on your mind today?**",
   ts: Date.now(),
 };
 
