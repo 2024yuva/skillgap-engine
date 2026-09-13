@@ -7,8 +7,13 @@
   --accent-hover: #4f46e5;
 }
 
+/* Modern Custom Scrollbar System */
+
+/* Firefox support */
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #a5b4fc #f1f5f9;
 }
 
 body {
@@ -19,17 +24,275 @@ body {
   color: #0f172a;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+/* Chrome / Safari / Edge Webkit Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 
-/* Sidebar scrollbar */
-.sidebar-scroll::-webkit-scrollbar-thumb { background: #2d3250; }
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  border: 2px solid #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6366f1;
+}
+
+/* Custom Light Scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #818cf8 #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #818cf8;
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4f46e5;
+}
+
+/* Dark Sidebar Scrollbar */
+.sidebar-scroll, .dark-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0f1117;
+}
+
+.sidebar-scroll::-webkit-scrollbar,
+.dark-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track,
+.dark-scrollbar::-webkit-scrollbar-track {
+  background: #0f1117;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.dark-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+  border: 2px solid #0f1117;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.dark-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6366f1;
+}
+
+/* Thin horizontal / list scrollbars */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #818cf8;
+}
 
 /* Smooth transitions */
 .transition-all { transition: all 0.15s ease; }
 
 /* Drag-drop highlight */
 .drag-over { border-color: #6366f1 !important; background: #eef2ff !important; }
+
+/* ── Seamless Expanding Circle Button Animation ───────────────────────────── */
+
+/* Base ripple button utility */
+.btn-ripple {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: color 0.4s ease, border-color 0.4s ease, background-color 0.4s ease;
+}
+
+.btn-ripple::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background-color: var(--ripple-bg, #111111);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.btn-ripple:hover::before {
+  width: 300%;
+  height: 300%;
+}
+
+/* Primary indigo expanding button */
+.btn-signup,
+.btn-primary-ripple {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: color 0.4s ease, border-color 0.4s ease, background-color 0.4s ease;
+  --ripple-bg: #4338ca;
+}
+
+.btn-signup::before,
+.btn-primary-ripple::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background-color: var(--ripple-bg, #4338ca);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.btn-signup:hover::before,
+.btn-primary-ripple:hover::before {
+  width: 300%;
+  height: 300%;
+}
+
+/* Global button rule for all buttons across the application */
+button:not(.no-ripple):not(:disabled) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: color 0.4s ease, background-color 0.4s ease, border-color 0.4s ease, transform 0.2s ease;
+}
+
+button:not(.no-ripple):not(:disabled)::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background-color: currentColor;
+  opacity: 0.15;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+button:not(.no-ripple):not(:disabled):hover::before {
+  width: 300%;
+  height: 300%;
+}
+
+/* ── Landing Page Animations ────────────────────────────────────────────── */
+
+/* Company logos scrolling animations */
+@keyframes scroll-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes scroll-right {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.animate-scroll-left {
+  animation: scroll-left 30s linear infinite;
+}
+
+.animate-scroll-right {
+  animation: scroll-right 30s linear infinite;
+}
+
+/* Floating animations for decorative elements */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes float-delay {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delay {
+  animation: float-delay 4s ease-in-out infinite 2s;
+}
+
+/* Gradient text animation */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 4s ease infinite;
+}
+
+/* Scale on hover for cards */
+.hover-scale {
+  transition: transform 0.3s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Smooth entrance animations */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+/* Staggered animation delays */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+
+

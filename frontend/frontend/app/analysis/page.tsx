@@ -196,7 +196,7 @@ export default function AnalysisPage() {
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
 
         {/* ── Hero header ─────────────────────────────────────────────────── */}
-        <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-100 p-6">
+        <div className="bg-linear-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-100 p-6">
           <p className="text-xs font-semibold text-indigo-500 uppercase tracking-widest mb-1">
             Your Path to
           </p>
@@ -226,8 +226,8 @@ export default function AnalysisPage() {
                   key={s}
                   onClick={() => setActiveSection(isActive ? "all" : s)}
                   className={`rounded-xl p-3 border text-left transition-all ${isActive
-                      ? `${cfg.bg} ${cfg.ring} border-2`
-                      : "bg-white border-slate-200 hover:border-indigo-200"
+                    ? `${cfg.bg} ${cfg.ring} border-2`
+                    : "bg-white border-slate-200 hover:border-indigo-200"
                     }`}
                 >
                   <div className="flex items-center gap-1.5 mb-1">

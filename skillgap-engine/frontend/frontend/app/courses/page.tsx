@@ -31,13 +31,14 @@ export default function CoursesPage() {
   const [result, setResult] = useState<CourseRecommendationResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [noRole, setNoRole] = useState(false);
   const [filter, setFilter] = useState<"all" | "top">("top");
 
   useEffect(() => {
     const session = getSession();
     const role = getSelectedRole();
     if (!session) { router.replace("/"); return; }
-    if (!role) { router.replace("/role"); return; }
+    if (!role) { setNoRole(true); setLoading(false); return; }
 
     api.analysis.recommendations(session.id, role.id, 12)
       .then(setResult)
@@ -47,6 +48,29 @@ export default function CoursesPage() {
 
   const recs = result?.recommendations ?? [];
   const displayed = filter === "top" ? recs.slice(0, 6) : recs;
+
+  if (noRole) return (
+    <AppShell>
+      <div className="flex items-center justify-center h-full min-h-96">
+        <div className="text-center max-w-sm px-6">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto mb-4">
+            <BookOpen size={28} className="text-indigo-400" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-800 mb-2">No target role selected</h2>
+          <p className="text-sm text-slate-500 mb-5">
+            Pick a target role first so we can recommend the right courses for your gaps.
+          </p>
+          <button
+            onClick={() => router.push("/role")}
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all"
+          >
+            Choose a Target Role
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+    </AppShell>
+  );
 
   if (loading) return (
     <AppShell>
@@ -172,12 +196,9 @@ function CourseRow({ rec, rank }: { rec: CourseRecommendation; rank: number }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3 mb-2">
             <h3 className="text-sm font-bold text-slate-800 leading-snug">{course.title}</h3>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${impactColor}`}>
-                {impactLabel} Impact
-              </span>
-              <span className="text-xs font-mono text-slate-400">{impact_score.toFixed(3)}</span>
-            </div>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ${impactColor}`}>
+              {impactLabel} Impact
+            </span>
           </div>
 
           {/* Meta chips */}

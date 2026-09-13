@@ -233,7 +233,7 @@ export default function ProfilePage() {
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-slate-700">Extracted Skills Preview</h2>
-                  <span className="text-xs text-slate-400 bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-xs bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
                     {parsed.matched_competency_ids.length} competencies matched
                   </span>
                 </div>
