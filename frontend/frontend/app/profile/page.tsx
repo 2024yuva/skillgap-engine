@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
+import AtsResultsPanel from "@/components/AtsResultsPanel";
 import { api, type ParsedResumeProfile, type Competency } from "@/lib/api";
 import { getSession, setSession, getSelectedRole } from "@/lib/session";
 import {
@@ -34,6 +35,7 @@ export default function ProfilePage() {
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const [competencyNames, setCompetencyNames] = useState<Record<number, string>>({});
+  const [resultTab, setResultTab] = useState<"skills" | "ats">("skills");
 
   const selectedRole = typeof window !== "undefined" ? getSelectedRole() : null;
 
@@ -56,7 +58,7 @@ export default function ProfilePage() {
     if (f) pickFile(f);
   }
   function pickFile(f: File) {
-    setFile(f); setParsed(null); setParseError(""); setApplied(false);
+    setFile(f); setParsed(null); setParseError(""); setApplied(false); setResultTab("skills");
   }
 
   async function handleParse() {
@@ -65,6 +67,7 @@ export default function ProfilePage() {
     try {
       const result = await api.resume.parse(file);
       setParsed(result);
+      if (result.ats_analysis) setResultTab("ats");
       setEditedSkills(result.technical_skills);
       setEditedSoftSkills(result.soft_skills);
 
@@ -231,99 +234,136 @@ export default function ProfilePage() {
             {/* Parsed results */}
             {parsed ? (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-slate-700">Extracted Skills Preview</h2>
-                  <span className="text-xs bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
-                    {parsed.matched_competency_ids.length} competencies matched
-                  </span>
+                {/* Card tab switcher */}
+                <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit mb-4">
+                  {(["skills", "ats"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setResultTab(t)}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        resultTab === t
+                          ? "bg-white text-indigo-600 shadow-sm"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      {t === "skills" ? "Skills Preview" : "ATS Report"}
+                      {t === "ats" && parsed.ats_analysis && (
+                        <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-bold">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  ))}
                 </div>
 
-                <p className="text-xs text-slate-400 mb-4">
-                  We found the following from your resume. You can add or remove items.
-                </p>
-
-                <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-1">
-                  {/* Name + Education */}
-                  {(parsed.name || parsed.education) && (
-                    <section>
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Profile</h3>
-                      {parsed.name && <p className="text-sm text-slate-700 font-medium">{parsed.name}</p>}
-                      {parsed.education && <p className="text-xs text-slate-500">{parsed.education}</p>}
-                    </section>
-                  )}
-
-                  {/* Technical Skills */}
-                  <SkillChipGroup
-                    label="Technical Skills"
-                    color="indigo"
-                    items={editedSkills}
-                    onRemove={(s) => setEditedSkills(p => p.filter(x => x !== s))}
-                  />
-
-                  {/* Soft Skills */}
-                  {editedSoftSkills.length > 0 && (
-                    <SkillChipGroup
-                      label="Soft Skills"
-                      color="violet"
-                      items={editedSoftSkills}
-                      onRemove={(s) => setEditedSoftSkills(p => p.filter(x => x !== s))}
-                    />
-                  )}
-
-                  {/* Education */}
-                  {parsed.education && (
-                    <section>
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Education</h3>
-                      <p className="text-xs text-slate-600">{parsed.education}</p>
-                    </section>
-                  )}
-
-                  {/* Experience */}
-                  {parsed.experience_summary && (
-                    <section>
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Experience</h3>
-                      <p className="text-xs text-slate-600">{parsed.experience_summary}</p>
-                    </section>
-                  )}
-
-                  {/* Courses */}
-                  {parsed.courses_certifications.length > 0 && (
-                    <section>
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Courses / Certifications</h3>
-                      <ul className="space-y-1">
-                        {parsed.courses_certifications.map((c, i) => (
-                          <li key={i} className="text-xs text-slate-600 flex items-start gap-1.5">
-                            <span className="text-indigo-400 mt-0.5">•</span>{c}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  )}
-
-                  {/* Inferred levels preview */}
-                  <section>
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Inferred Competency Levels</h3>
-                    <div className="space-y-1.5">
-                      {Object.entries(parsed.inferred_levels).slice(0, 6).map(([id, level]) => {
-                        const name = competencyNames[Number(id)] ?? `Competency #${id}`;
-                        return (
-                          <div key={id} className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-slate-600 truncate">{name}</span>
-                            <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full shrink-0">
-                              {LEVEL_LABELS[level]}
-                            </span>
-                          </div>
-                        );
-                      })}
-                      {Object.keys(parsed.inferred_levels).length > 6 && (
-                        <p className="text-xs text-slate-400">+{Object.keys(parsed.inferred_levels).length - 6} more competencies detected</p>
-                      )}
-                      {Object.keys(parsed.inferred_levels).length === 0 && (
-                        <p className="text-xs text-slate-400">No competencies matched from this resume.</p>
-                      )}
+                {resultTab === "skills" ? (
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-sm font-semibold text-slate-700">Extracted Skills Preview</h2>
+                      <span className="text-xs text-slate-400 bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                        {parsed.matched_competency_ids.length} competencies matched
+                      </span>
                     </div>
-                  </section>
-                </div>
+
+                    <p className="text-xs text-slate-400 mb-4">
+                      We found the following from your resume. You can add or remove items.
+                    </p>
+
+                    <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-1">
+                      {/* Name + Education */}
+                      {(parsed.name || parsed.education) && (
+                        <section>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Profile</h3>
+                          {parsed.name && <p className="text-sm text-slate-700 font-medium">{parsed.name}</p>}
+                          {parsed.education && <p className="text-xs text-slate-500">{parsed.education}</p>}
+                        </section>
+                      )}
+
+                      {/* Technical Skills */}
+                      <SkillChipGroup
+                        label="Technical Skills"
+                        color="indigo"
+                        items={editedSkills}
+                        onRemove={(s) => setEditedSkills(p => p.filter(x => x !== s))}
+                      />
+
+                      {/* Soft Skills */}
+                      {editedSoftSkills.length > 0 && (
+                        <SkillChipGroup
+                          label="Soft Skills"
+                          color="violet"
+                          items={editedSoftSkills}
+                          onRemove={(s) => setEditedSoftSkills(p => p.filter(x => x !== s))}
+                        />
+                      )}
+
+                      {/* Education */}
+                      {parsed.education && (
+                        <section>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Education</h3>
+                          <p className="text-xs text-slate-600">{parsed.education}</p>
+                        </section>
+                      )}
+
+                      {/* Experience */}
+                      {parsed.experience_summary && (
+                        <section>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Experience</h3>
+                          <p className="text-xs text-slate-600">{parsed.experience_summary}</p>
+                        </section>
+                      )}
+
+                      {/* Courses */}
+                      {parsed.courses_certifications.length > 0 && (
+                        <section>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Courses / Certifications</h3>
+                          <ul className="space-y-1">
+                            {parsed.courses_certifications.map((c, i) => (
+                              <li key={i} className="text-xs text-slate-600 flex items-start gap-1.5">
+                                <span className="text-indigo-400 mt-0.5">•</span>{c}
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      )}
+
+                      {/* Inferred levels preview */}
+                      <section>
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Inferred Competency Levels</h3>
+                        <div className="space-y-1.5">
+                          {Object.entries(parsed.inferred_levels).slice(0, 6).map(([id, level]) => {
+                            const name = competencyNames[Number(id)] ?? `Competency #${id}`;
+                            return (
+                              <div key={id} className="flex items-center justify-between gap-2">
+                                <span className="text-xs text-slate-600 truncate">{name}</span>
+                                <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full shrink-0">
+                                  {LEVEL_LABELS[level]}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {Object.keys(parsed.inferred_levels).length > 6 && (
+                            <p className="text-xs text-slate-400">+{Object.keys(parsed.inferred_levels).length - 6} more competencies detected</p>
+                          )}
+                          {Object.keys(parsed.inferred_levels).length === 0 && (
+                            <p className="text-xs text-slate-400">No competencies matched from this resume.</p>
+                          )}
+                        </div>
+                      </section>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
+                    {parsed.ats_analysis ? (
+                      <AtsResultsPanel data={parsed.ats_analysis} />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
+                        <p className="text-sm font-semibold text-slate-400">ATS analysis unavailable</p>
+                        <p className="text-xs text-slate-300">The server did not return ATS data for this resume.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3 mt-5 pt-4 border-t border-slate-100">

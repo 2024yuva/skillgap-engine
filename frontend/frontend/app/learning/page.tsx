@@ -11,12 +11,13 @@ export default function LearningPathPage() {
   const router = useRouter();
   const [recs, setRecs] = useState<CourseRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [noRole, setNoRole] = useState(false);
 
   useEffect(() => {
     const session = getSession();
     const role = getSelectedRole();
     if (!session) { router.replace("/"); return; }
-    if (!role) { router.replace("/role"); return; }
+    if (!role) { setNoRole(true); setLoading(false); return; }
     api.analysis.recommendations(session.id, role.id, 8)
       .then(r => setRecs(r.recommendations))
       .catch(() => {})
@@ -24,6 +25,29 @@ export default function LearningPathPage() {
   }, [router]);
 
   const role = typeof window !== "undefined" ? getSelectedRole() : null;
+
+  if (noRole) return (
+    <AppShell>
+      <div className="flex items-center justify-center h-full min-h-96">
+        <div className="text-center max-w-sm px-6">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto mb-4">
+            <Map size={28} className="text-indigo-400" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-800 mb-2">No target role selected</h2>
+          <p className="text-sm text-slate-500 mb-5">
+            Pick a target role first so we can build your personalised learning path.
+          </p>
+          <button
+            onClick={() => router.push("/role")}
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all"
+          >
+            Choose a Target Role
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+    </AppShell>
+  );
 
   return (
     <AppShell>

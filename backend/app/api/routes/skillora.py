@@ -160,3 +160,47 @@ def get_job(job_id: int, db: Session = Depends(get_db)):
     if not job:
         raise HTTPException(status_code=404, detail=f"Job reference {job_id} not found")
     return job
+
+
+# ---------------------------------------------------------------------------
+# AI Chatbot
+# ---------------------------------------------------------------------------
+
+from app.services.chat_service import get_chat_response
+
+
+class ChatTurn(BaseModel):
+    role: str   # "user" | "assistant"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    user_id: Optional[int] = None
+    message: str
+    history: List[ChatTurn] = []
+    page_context: str = ""
+
+
+class ChatResponse(BaseModel):
+    reply: str
+
+
+@router.post("/chat", response_model=ChatResponse)
+def skillora_chat(payload: ChatRequest, db: Session = Depends(get_db)):
+    """
+    Skillora AI Assistant chat endpoint.
+    Accepts user message + conversation history, returns AI reply.
+    """
+    if not payload.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+
+    history = [{"role": t.role, "content": t.content} for t in payload.history]
+
+    reply = get_chat_response(
+        user_id=payload.user_id,
+        message=payload.message,
+        history=history,
+        page_context=payload.page_context,
+        db=db,
+    )
+    return ChatResponse(reply=reply)
