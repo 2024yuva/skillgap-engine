@@ -112,7 +112,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-white truncate">{user?.name ?? "..."}</p>
-              <p className="text-[10px] text-slate-400 truncate">{user?.education ?? "Set up your profile"}</p>
+              <p className="text-[10px] text-slate-400 truncate">{user?.department ?? user?.education ?? "Set up your profile"}</p>
             </div>
           </div>
           <button

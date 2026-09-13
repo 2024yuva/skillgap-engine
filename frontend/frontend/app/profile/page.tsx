@@ -67,6 +67,7 @@ export default function ProfilePage() {
     try {
       const result = await api.resume.parse(file);
       setParsed(result);
+      if (result.ats_analysis) setResultTab("ats");
       setEditedSkills(result.technical_skills);
       setEditedSoftSkills(result.soft_skills);
 

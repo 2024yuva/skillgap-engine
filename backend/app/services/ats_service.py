@@ -1,73 +1,84 @@
 """
 SkillGap Engine — ATS Resume Checker & AI Content Detector Service.
-Powered by Groq API (llama-3.3-70b-versatile).
+Powered by Groq API with OpenAI GPT-OSS-120B for personalized resume analysis.
 """
 
 from __future__ import annotations
 import os
 import re
 import json
-import urllib.request
-import urllib.error
 from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 
 load_dotenv()
 
+try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
+    Groq = None
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-PRIMARY_MODEL = "llama-3.3-70b-versatile"
-FALLBACK_MODEL = "llama-3.1-8b-instant"
 
 
-def _call_groq_api(prompt: str, system_prompt: str, model: str = PRIMARY_MODEL) -> Optional[Dict[str, Any]]:
-    """Calls Groq Chat Completions API with JSON response format."""
-    if not GROQ_API_KEY:
+def _call_groq_api(prompt: str, system_prompt: str, model: str = "openai/gpt-oss-120b") -> Optional[Dict[str, Any]]:
+    """Calls Groq Chat Completions API using the official Groq client."""
+    if not GROQ_AVAILABLE or not GROQ_API_KEY:
+        print("Groq not available: GROQ_AVAILABLE =", GROQ_AVAILABLE, "GROQ_API_KEY =", bool(GROQ_API_KEY))
         return None
-
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json",
-        "User-Agent": "SkillGapEngine-ATS/1.0",
-    }
-    
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 3000,
-        "response_format": {"type": "json_object"},
-    }
-
-    req = urllib.request.Request(
-        GROQ_API_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST"
-    )
 
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            content = data["choices"][0]["message"]["content"]
-            return json.loads(content)
-    except urllib.error.HTTPError as e:
-        # Try fallback model if rate-limited or primary model busy
-        if model != FALLBACK_MODEL and e.code in (429, 500, 503):
-            try:
-                return _call_groq_api(prompt, system_prompt, model=FALLBACK_MODEL)
-            except Exception:
-                pass
-        return None
-    except Exception:
-        if model != FALLBACK_MODEL:
-            try:
-                return _call_groq_api(prompt, system_prompt, model=FALLBACK_MODEL)
-            except Exception:
-                pass
+        client = Groq(api_key=GROQ_API_KEY)
+        
+        print(f"Making Groq API call with model: {model}")
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.3,
+            max_completion_tokens=4000,
+            top_p=1,
+            stream=False,
+            stop=None
+        )
+        
+        content = completion.choices[0].message.content
+        print("Groq API response received, content length:", len(content) if content else 0)
+        
+        if not content:
+            print("No content in Groq response")
+            return None
+            
+        # Parse JSON response
+        try:
+            result = json.loads(content)
+            print("Successfully parsed JSON from Groq response")
+            return result
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}")
+            # Try to extract JSON from response if wrapped in markdown
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+            if json_match:
+                try:
+                    result = json.loads(json_match.group(1))
+                    print("Successfully extracted JSON from markdown")
+                    return result
+                except json.JSONDecodeError:
+                    print("Failed to parse extracted JSON")
+            print("Raw response content:", content[:500])
+            return None
+            
+    except Exception as e:
+        print(f"Groq API error with model {model}: {e}")
+        # Try fallback model if the primary model fails
+        if model != "llama-3.3-70b-versatile":
+            print("Trying fallback model: llama-3.3-70b-versatile")
+            return _call_groq_api(prompt, system_prompt, model="llama-3.3-70b-versatile")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -98,8 +109,15 @@ def _heuristic_fallback_analysis(resume_text: str, extracted_skills: List[str]) 
         verdict = "Likely Human-Written"
         verdict_summary = "Authentic tone with organic sentence structure and domain-specific terminology."
 
-    # 2. Metrics detection
-    metric_matches = re.findall(r"(\b\d+[%+kKmM]?\b|\$\d+[\d,]*|\b\d+\s*(?:users|clients|projects|ms|seconds|x|percent)\b)", resume_text)
+    # 2. Metrics detection — match only meaningful figures (%, $, scale suffixes, or domain units)
+    # Explicitly exclude bare 7+ digit numbers (phone numbers, student IDs, etc.)
+    metric_matches = [
+        m for m in re.findall(
+            r"(\b\d+[%+kKmM]\b|\$\d+[\d,]*|\b\d+\s*(?:users|clients|projects|ms|seconds|x|percent)\b)",
+            resume_text,
+        )
+        if not re.fullmatch(r"\d{7,}", m.strip())
+    ]
     metric_count = len(metric_matches)
     
     # 3. Action verbs
@@ -173,7 +191,7 @@ def _heuristic_fallback_analysis(resume_text: str, extracted_skills: List[str]) 
             "bullet_point_improvements": [
                 {
                     "original": weak_hits[0].capitalize() + " on a key deliverable." if weak_hits else "Worked on development tasks.",
-                    "improved": f"Built and delivered end-to-end solutions, reducing manual effort by ~30% through process automation." if not metric_matches else f"Developed feature reducing processing time by {metric_matches[0]}.",
+                    "improved": "Built and delivered end-to-end solutions, reducing manual effort by ~30% through process automation.",
                     "explanation": "Leads with a strong action verb and ties the work to a concrete measurable outcome.",
                     "formula_applied": ""
                 }
@@ -198,115 +216,129 @@ def _heuristic_fallback_analysis(resume_text: str, extracted_skills: List[str]) 
 
 def analyze_resume_ats(resume_text: str, extracted_skills: Optional[List[str]] = None) -> Dict[str, Any]:
     """
-    Executes deep ATS compatibility analysis & AI content detection via Groq (Llama-3.3-70b-versatile).
-    Falls back gracefully to deterministic analysis if API is offline.
+    Executes deep ATS compatibility analysis & AI content detection via Groq OpenAI GPT-OSS-120B.
+    Provides honest, personalized feedback specific to each resume.
+    Falls back gracefully to deterministic analysis if API is unavailable.
     """
     if extracted_skills is None:
         extracted_skills = []
 
     # Clean and truncate text if extraordinarily huge to prevent token limit issues
     clean_text = resume_text.strip()
-    if len(clean_text) > 8000:
-        clean_text = clean_text[:8000]
+    if len(clean_text) > 12000:
+        clean_text = clean_text[:12000]
 
     system_prompt = (
-        "You are an elite ATS (Applicant Tracking System) Auditor, Resume Architect, and AI Content Detector. "
-        "Your task is to thoroughly analyze the provided resume text. "
-        "You must evaluate: "
-        "1. AI vs Human Detection (AI probability score 0-100%, synthetic style flags, authentic markers). "
-        "2. ATS Compatibility Score (0-100 overall, breakdown across formatting, impact verbs, metrics, completeness, readability, keywords). "
-        "3. Diagnostics (strengths, critical red flags, strong vs weak action verbs, metric counts). "
-        "4. A HIGHLY PERSONALIZED resume improvement guide based SOLELY on the actual content of this specific resume — "
-        "   all recommendations, bullet rewrites, missing keywords, and sections must be specific to what IS and IS NOT in this resume. "
-        "   Never use placeholder or generic advice. Bullet rewrites must use actual lines from the resume. "
-        "   formula_applied must always be an empty string. "
-        "Respond ONLY with valid, strict JSON matching the exact schema requested."
+        "You are an elite ATS (Applicant Tracking System) expert and professional resume reviewer with 15+ years of experience "
+        "in technical recruiting and talent acquisition. You provide brutally honest, constructive feedback that helps candidates "
+        "improve their resumes significantly.\n\n"
+        
+        "Your analysis must be:\n"
+        "1. PERSONALIZED - Based entirely on the specific content, strengths, and weaknesses of THIS resume\n"
+        "2. HONEST - Point out real issues without sugar-coating, but remain constructive\n"
+        "3. ACTIONABLE - Every recommendation must be specific and implementable\n"
+        "4. VARIED - Each resume gets unique feedback; avoid template responses\n\n"
+        
+        "Analyze the resume across these dimensions:\n"
+        "- AI vs Human writing patterns (detect synthetic/template language vs authentic voice)\n"
+        "- ATS compatibility (formatting, keywords, structure that systems can parse)\n"
+        "- Impact and quantification (measurable achievements vs vague descriptions)\n"
+        "- Professional presentation (clarity, conciseness, relevance)\n"
+        "- Technical depth and credibility (for technical roles)\n\n"
+        
+        "Be direct about weaknesses but always provide concrete improvement paths. "
+        "Focus on what will make the biggest difference for this specific candidate's job search success.\n\n"
+        
+        "CRITICAL: You must respond with ONLY valid JSON. No markdown, no explanations, no code blocks. "
+        "Just pure JSON starting with { and ending with }."
     )
 
     user_prompt = f"""
-Analyze this resume text and provide a comprehensive ATS & AI diagnostic report.
+Analyze this resume and provide a comprehensive, personalized ATS review with honest feedback.
 
-EXTRACTED SKILLS SO FAR: {json.dumps(extracted_skills[:15])}
+CANDIDATE'S TECHNICAL SKILLS: {json.dumps(extracted_skills[:20])}
 
-RESUME TEXT:
-\"\"\"
+RESUME CONTENT:
 {clean_text}
-\"\"\"
 
-Return a valid JSON object matching this exact schema:
+Provide your analysis as a JSON object with this structure:
 {{
   "ai_detection": {{
-    "ai_probability_score": <int 0-100>,
-    "human_score": <int 0-100>,
-    "verdict": "<'Likely Human-Written' | 'Mixed / AI-Assisted' | 'Heavily AI-Generated'>",
-    "verdict_summary": "<concise 1-2 sentence evaluation>",
-    "flagged_ai_patterns": ["<flag 1>", "<flag 2>"],
-    "human_markers": ["<marker 1>", "<marker 2>"]
+    "ai_probability_score": <0-100 integer>,
+    "human_score": <0-100 integer>,
+    "verdict": "<Likely Human-Written|Mixed AI-Assisted|Heavily AI-Generated>",
+    "verdict_summary": "<honest assessment in 1-2 sentences>",
+    "flagged_ai_patterns": ["<specific AI pattern 1>", "<specific AI pattern 2>"],
+    "human_markers": ["<authentic element 1>", "<authentic element 2>"]
   }},
   "ats_scoring": {{
-    "overall_score": <int 0-100>,
-    "grade": "<'A+ (Excellent)' | 'A (Strong)' | 'B (Good)' | 'C (Needs Work)' | 'D (Rework Required)'>",
-    "formatting_score": <int 0-100>,
-    "impact_score": <int 0-100>,
-    "metrics_score": <int 0-100>,
-    "completeness_score": <int 0-100>,
-    "readability_score": <int 0-100>,
-    "keyword_score": <int 0-100>
+    "overall_score": <0-100 integer>,
+    "grade": "<A+ Excellent|A Strong|B Good|C Needs Work|D Rework Required>",
+    "formatting_score": <0-100 integer>,
+    "impact_score": <0-100 integer>,
+    "metrics_score": <0-100 integer>,
+    "completeness_score": <0-100 integer>,
+    "readability_score": <0-100 integer>,
+    "keyword_score": <0-100 integer>
   }},
   "diagnostics": {{
-    "key_strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-    "critical_issues": ["<issue 1>", "<issue 2>"],
-    "quantifiable_metrics_count": <int count of numbers/percentages found>,
-    "quantifiable_metrics_examples": ["<metric example 1>", "<metric example 2>"],
-    "action_verbs_strong": ["<strong verb 1>", "<strong verb 2>"],
-    "action_verbs_weak": ["<weak verb 1>", "<weak verb 2>"],
+    "key_strengths": ["<specific strength 1>", "<specific strength 2>", "<specific strength 3>"],
+    "critical_issues": ["<honest critique 1>", "<honest critique 2>"],
+    "quantifiable_metrics_count": <integer>,
+    "quantifiable_metrics_examples": ["<actual metric 1>", "<actual metric 2>"],
+    "action_verbs_strong": ["<strong verb used>", "<strong verb used>"],
+    "action_verbs_weak": ["<weak phrase used>", "<weak phrase used>"],
     "section_health": [
-      {{"section": "Contact Information", "status": "<'good'|'warning'|'missing'>", "feedback": "<feedback>"}},
-      {{"section": "Professional Summary", "status": "<'good'|'warning'|'missing'>", "feedback": "<feedback>"}},
-      {{"section": "Technical Skills", "status": "<'good'|'warning'|'missing'>", "feedback": "<feedback>"}},
-      {{"section": "Work Experience / Projects", "status": "<'good'|'warning'|'missing'>", "feedback": "<feedback>"}},
-      {{"section": "Education", "status": "<'good'|'warning'|'missing'>", "feedback": "<feedback>"}}
+      {{"section": "Contact Information", "status": "good|warning|missing", "feedback": "<specific feedback>"}},
+      {{"section": "Professional Summary", "status": "good|warning|missing", "feedback": "<specific feedback>"}},
+      {{"section": "Technical Skills", "status": "good|warning|missing", "feedback": "<specific feedback>"}},
+      {{"section": "Work Experience", "status": "good|warning|missing", "feedback": "<specific feedback>"}},
+      {{"section": "Education", "status": "good|warning|missing", "feedback": "<specific feedback>"}}
     ]
   }},
   "resume_builder_guide": {{
     "top_actionable_recommendations": [
-      "<specific recommendation 1 based on THIS resume's actual weaknesses — not generic advice>",
-      "<specific recommendation 2>",
-      "<specific recommendation 3>",
-      "<specific recommendation 4>",
-      "<specific recommendation 5>"
+      "<personalized recommendation 1 for THIS resume>",
+      "<personalized recommendation 2 for THIS resume>",
+      "<personalized recommendation 3 for THIS resume>",
+      "<personalized recommendation 4 for THIS resume>",
+      "<personalized recommendation 5 for THIS resume>"
     ],
     "bullet_point_improvements": [
       {{
-        "original": "<an actual weak or generic bullet found in the resume>",
-        "improved": "<re-written high-impact version with strong action verbs and concrete metrics>",
-        "explanation": "<why this rewrite is far more compelling for ATS and hiring managers>",
+        "original": "<actual weak bullet from this resume>",
+        "improved": "<rewritten version with strong impact>",
+        "explanation": "<why this improvement makes a difference>",
         "formula_applied": ""
       }},
       {{
-        "original": "<second weak bullet from resume>",
-        "improved": "<improved high-impact rewrite>",
-        "explanation": "<explanation>",
+        "original": "<second actual weak bullet from this resume>", 
+        "improved": "<rewritten version with metrics and action>",
+        "explanation": "<explanation of improvement>",
         "formula_applied": ""
       }}
     ],
-    "missing_critical_keywords": ["<keyword missing from resume but important for their apparent target role>", "<keyword 2>", "<keyword 3>"],
-    "recommended_sections_to_add": ["<specific section missing from THIS resume — e.g. Professional Summary, GitHub Projects, Certifications>", "<section 2>"],
+    "missing_critical_keywords": ["<missing keyword 1>", "<missing keyword 2>", "<missing keyword 3>"],
+    "recommended_sections_to_add": ["<section this resume lacks>", "<another missing section>"],
     "formatting_checklist": [
-      {{"item": "Single-Column Clean Layout", "passed": true, "tip": "Multi-column tables can confuse ATS parsers."}},
-      {{"item": "Standard Section Headings", "passed": true, "tip": "Use standard titles: Experience, Education, Skills, Projects."}},
-      {{"item": "Quantifiable Metrics Present", "passed": <true|false>, "tip": "Include %, $, user counts, or time improvements."}},
-      {{"item": "Action-Oriented Bullets", "passed": <true|false>, "tip": "Begin with strong action verbs like Architected, Reduced, Spearheaded."}},
-      {{"item": "Standard Font & Hierarchy", "passed": true, "tip": "Use standard fonts (Inter, Arial, Calibri) 10-12pt."}}
+      {{"item": "Clean Single-Column Layout", "passed": true, "tip": "ATS systems prefer simple layouts"}},
+      {{"item": "Standard Section Headers", "passed": true, "tip": "Use Experience, Education, Skills, Projects"}},
+      {{"item": "Quantified Achievements", "passed": <true|false>, "tip": "Include numbers, percentages, scales"}},
+      {{"item": "Strong Action Verbs", "passed": <true|false>, "tip": "Start bullets with Built, Developed, Optimized"}},
+      {{"item": "Professional Font Choice", "passed": true, "tip": "Stick to Arial, Calibri, or similar clean fonts"}}
     ]
   }}
 }}
+
+Focus on what's actually in this resume. Be specific, honest, and constructive in your feedback.
 """
 
-    result = _call_groq_api(user_prompt, system_prompt, model=PRIMARY_MODEL)
+    result = _call_groq_api(user_prompt, system_prompt)
 
     if result and "ats_scoring" in result and "ai_detection" in result:
+        print("Groq API returned valid result, using it")
         return result
 
+    print("Groq API failed or returned invalid result, falling back to heuristic analysis")
     # Fallback to local heuristic engine if API is unavailable or returns invalid shape
     return _heuristic_fallback_analysis(clean_text, extracted_skills)

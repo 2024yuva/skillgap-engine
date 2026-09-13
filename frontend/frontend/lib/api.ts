@@ -2,34 +2,55 @@
  * Typed API client for SkillGap Engine backend.
  */
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+const BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+
+// ---------------------------------------------------------------------------
+// HTTP helpers
+// ---------------------------------------------------------------------------
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+  const res = await fetch(`${BASE}${path}`, {
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`GET ${path} failed: ${res.status}`);
+  }
+
   return res.json();
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(body),
   });
+
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`POST ${path} failed: ${res.status} ${text}`);
   }
+
   return res.json();
 }
 
 async function put<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`);
+
+  if (!res.ok) {
+    throw new Error(`PUT ${path} failed: ${res.status}`);
+  }
+
   return res.json();
 }
 
@@ -73,20 +94,40 @@ export interface CompetencyGap {
   competency_id: number;
   competency_name: string;
   category: string;
+
   current_level: number;
   required_level: number;
   gap: number;
+
   importance: number;
   priority_score: number;
+
+  evidence: string | null;
   evidence_source: string | null;
-  // User-facing classification fields
-  status: "strong_match" | "related" | "needs_verification" | "needs_development" | "missing";
+
+  confidence: number;
+
+  status:
+    | "strong_match"
+    | "related"
+    | "needs_verification"
+    | "needs_development"
+    | "missing";
+
   status_label: string;
   status_reason: string;
+
   related_skill_name: string | null;
-  confidence: number;
+
   action_label: string;
+
   evidence_bullets: string[];
+
+  classification: string;
+
+  explanation: string;
+
+  verification_status: string;
 }
 
 export interface GapAnalysisResult {
@@ -94,10 +135,14 @@ export interface GapAnalysisResult {
   role_id: number;
   role_name: string;
   user_name: string;
+
   gaps: CompetencyGap[];
+
   covered_count: number;
   gap_count: number;
+
   readiness_score: number;
+
   strong_match_count: number;
   related_count: number;
   needs_verification_count: number;
@@ -150,6 +195,7 @@ export interface AiDetection {
 export interface AtsScoring {
   overall_score: number;
   grade: string;
+
   formatting_score: number;
   impact_score: number;
   metrics_score: number;
@@ -167,10 +213,13 @@ export interface SectionHealthItem {
 export interface AtsDiagnostics {
   key_strengths: string[];
   critical_issues: string[];
+
   quantifiable_metrics_count: number;
   quantifiable_metrics_examples: string[];
+
   action_verbs_strong: string[];
   action_verbs_weak: string[];
+
   section_health: SectionHealthItem[];
 }
 
@@ -189,9 +238,13 @@ export interface FormattingChecklistItem {
 
 export interface ResumeBuilderGuide {
   top_actionable_recommendations: string[];
+
   bullet_point_improvements: BulletPointImprovement[];
+
   missing_critical_keywords: string[];
+
   recommended_sections_to_add: string[];
+
   formatting_checklist: FormattingChecklistItem[];
 }
 
@@ -204,71 +257,115 @@ export interface AtsAnalysisResult {
 
 export interface ParsedResumeProfile {
   name: string | null;
+
   education: string;
+
   experience_summary: string;
+
   technical_skills: string[];
+
   soft_skills: string[];
+
   projects: string[];
+
   courses_certifications: string[];
+
   matched_competency_ids: number[];
+
   inferred_levels: Record<string, number>;
+
   ats_analysis?: AtsAnalysisResult;
 }
 
-
 export interface AssessmentQuestion {
   id: number;
+
   topic: string;
+
   question_text: string;
+
   question_type: "mcq" | "trace" | "complexity";
+
   options: string[] | null;
+
   correct_answer: string;
+
   explanation: string;
+
   difficulty: "easy" | "medium" | "hard";
 }
 
 export interface TopicResult {
   topic: string;
+
   score: number;
+
   label: string;
+
   questions_attempted: number;
+
   questions_correct: number;
 }
 
 export interface AssessmentResult {
   user_id: number;
+
   competency_id: number;
+
   competency_name: string;
+
   overall_score: number;
+
   verified_level: number;
+
   topic_results: TopicResult[];
+
   summary: string;
+
   strongest_topics: string[];
+
   development_areas: string[];
 }
 
 export interface RoleMatch {
   id: number;
+
   name: string;
+
   sector: string;
+
   description: string | null;
+
   match_score: number;
+
   matched_count: number;
+
   total_required: number;
+
   matched_skills: string[];
+
   missing_skills: string[];
 }
 
 export interface CompanyJobMatch {
   company_name: string;
+
   about_role: string;
+
   category: string;
+
   required_skills: string;
+
   matched_skills: string[];
+
   missing_skills: string[];
+
   match_score: number;
+
   working_duration: string;
+
   application_link: string;
+
   salary_lpa: string;
 }
 
@@ -279,57 +376,135 @@ export interface CompanyJobMatch {
 export const api = {
   users: {
     list: () => get<UserProfile[]>("/users/"),
+
     get: (id: number) => get<UserProfile>(`/users/${id}`),
-    create: (body: UserCreate) => post<UserProfile>("/users/", body),
-    update: (id: number, body: UserCreate) => put<UserProfile>(`/users/${id}`, body),
-    competencies: (id: number) => get<UserCompetency[]>(`/users/${id}/competencies`),
+
+    create: (body: UserCreate) =>
+      post<UserProfile>("/users/", body),
+
+    update: (id: number, body: UserCreate) =>
+      put<UserProfile>(`/users/${id}`, body),
+
+    competencies: (id: number) =>
+      get<UserCompetency[]>(`/users/${id}/competencies`),
   },
+
   roles: {
     list: () => get<Role[]>("/roles/"),
-    get: (id: number) => get<Role>(`/roles/${id}`),
-    matches: (userId: number) => get<RoleMatch[]>(`/roles/matches/${userId}`),
-    companyMatches: (userId: number) => get<CompanyJobMatch[]>(`/roles/company-matches/${userId}`),
+
+    get: (id: number) =>
+      get<Role>(`/roles/${id}`),
+
+    matches: (userId: number) =>
+      get<RoleMatch[]>(`/roles/matches/${userId}`),
+
+    companyMatches: (userId: number) =>
+      get<CompanyJobMatch[]>(
+        `/roles/company-matches/${userId}`
+      ),
   },
+
   competencies: {
     list: () => get<Competency[]>("/competencies/"),
   },
+
   analysis: {
     gaps: (userId: number, roleId: number) =>
-      get<GapAnalysisResult>(`/analysis/gap?user_id=${userId}&role_id=${roleId}`),
-    recommendations: (userId: number, roleId: number, topN = 8) =>
+      get<GapAnalysisResult>(
+        `/analysis/gap?user_id=${userId}&role_id=${roleId}`
+      ),
+
+    recommendations: (
+      userId: number,
+      roleId: number,
+      topN = 8
+    ) =>
       get<CourseRecommendationResult>(
         `/analysis/recommendations?user_id=${userId}&role_id=${roleId}&top_n=${topN}`
       ),
   },
+
   resume: {
     parse: async (file: File): Promise<ParsedResumeProfile> => {
       const form = new FormData();
+
       form.append("file", file);
-      const res = await fetch(`${BASE}/resume/parse`, { method: "POST", body: form });
+
+      const res = await fetch(`${BASE}/resume/parse`, {
+        method: "POST",
+        body: form,
+      });
+
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`Resume parse failed: ${res.status} ${text}`);
+
+        throw new Error(
+          `Resume parse failed: ${res.status} ${text}`
+        );
       }
+
       return res.json();
     },
-    apply: (userId: number, body: { inferred_levels: Record<number, number>; name?: string; education?: string }) =>
-      post<{ applied: number; user_id: number }>(`/resume/apply/${userId}`, body),
-    atsCheck: (text: string, extractedSkills: string[] = []) =>
-      post<AtsAnalysisResult>("/resume/ats-check", { text, extracted_skills: extractedSkills }),
+
+    apply: (
+      userId: number,
+      body: {
+        inferred_levels: Record<number, number>;
+        name?: string;
+        education?: string;
+      }
+    ) =>
+      post<{ applied: number; user_id: number }>(
+        `/resume/apply/${userId}`,
+        body
+      ),
+
+    atsCheck: (
+      text: string,
+      extractedSkills: string[] = []
+    ) =>
+      post<AtsAnalysisResult>(
+        "/resume/ats-check",
+        {
+          text,
+          extracted_skills: extractedSkills,
+        }
+      ),
   },
+
   assessment: {
     questions: (competencyId = 4) =>
-      get<AssessmentQuestion[]>(`/assessment/questions?competency_id=${competencyId}`),
-    submit: (body: { user_id: number; competency_id: number; answers: Record<number, string> }) =>
-      post<AssessmentResult>("/assessment/submit", body),
+      get<AssessmentQuestion[]>(
+        `/assessment/questions?competency_id=${competencyId}`
+      ),
+
+    submit: (body: {
+      user_id: number;
+      competency_id: number;
+      answers: Record<number, string>;
+    }) =>
+      post<AssessmentResult>(
+        "/assessment/submit",
+        body
+      ),
   },
+
   skillora: {
     chat: (body: {
       user_id?: number;
+
       message: string;
-      history: { role: "user" | "assistant"; content: string }[];
+
+      history: {
+        role: "user" | "assistant";
+        content: string;
+      }[];
+
       page_context?: string;
-    }) => post<{ reply: string }>("/skillora/chat", body),
+    }) =>
+      post<{ reply: string }>(
+        "/skillora/chat",
+        body
+      ),
   },
 };
-

@@ -470,6 +470,31 @@ export default function AtsResultsPanel({ data }: { data: AtsAnalysisResult }) {
           )}
         </div>
       </Section>
+
+      {/* Next Step Action Banner */}
+      <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 rounded-2xl p-6 text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+          <h3 className="text-base font-bold">Ready for the Next Step?</h3>
+          <p className="text-xs text-indigo-200 mt-1">
+            Now that your resume is parsed and analyzed, select your dream role to identify skill gaps and generate your custom learning path.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <a
+            href="/role"
+            className="inline-flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm"
+          >
+            Select Target Role →
+          </a>
+          <a
+            href="/analysis"
+            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all border border-white/20"
+          >
+            Skill Gap Analysis
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
+
